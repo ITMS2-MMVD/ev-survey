@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV Charging Feasibility Survey — Maharashtra Transport Dept.</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Material+Symbols+Outlined" rel="stylesheet">
+<style>
+:root{--amber:#e08c00;--teal:#0e5f54;--ink:#13201d;--slate:#5a6b66;--line:#dce6e2;--panel:#f2f7f5}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Sora',system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,#0b2e29,#0e5f54 60%);min-height:100vh}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';vertical-align:-5px}
+.wrap{max-width:860px;margin:0 auto;padding:42px 20px 60px}
+.brand{display:flex;align-items:center;gap:13px;color:#fff;margin-bottom:6px}
+.brand .ic{width:46px;height:46px;border-radius:13px;background:var(--amber);display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff}
+.brand h1{font-size:22px;margin:0;font-weight:800}
+.sub{color:#bfe0d8;font-size:14px;margin:0 0 26px 59px}
+.grid{display:grid;gap:16px}
+.card{display:flex;align-items:center;gap:16px;background:#fff;border-radius:16px;padding:20px;text-decoration:none;color:var(--ink);box-shadow:0 8px 26px rgba(0,0,0,.2);border-left:7px solid var(--cc);transition:transform .12s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:0 14px 34px rgba(0,0,0,.28)}
+.card .cic{width:54px;height:54px;border-radius:14px;background:var(--cc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;flex:0 0 54px}
+.card .t{font-weight:800;font-size:17px}
+.card .d{font-size:13px;color:var(--slate);margin-top:3px;line-height:1.4}
+.card .who{display:inline-block;margin-top:7px;font-size:11px;font-weight:700;color:var(--cc);background:color-mix(in srgb,var(--cc) 12%,#fff);border-radius:999px;padding:2px 9px}
+.foot{color:#9fc7bd;font-size:12px;margin-top:28px;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="ic"><span class="material-symbols-outlined">ev_station</span></span><h1>EV Charging Feasibility Survey</h1></div>
+  <p class="sub">Maharashtra State — Transport Department · shared cloud database (all apps stay in sync)</p>
+  <div class="grid">
+    <a class="card" style="--cc:#0e5f54" href="ev-survey-admin-panel-preloaded.html">
+      <span class="cic"><span class="material-symbols-outlined">tune</span></span>
+      <div><div class="t">Admin Control Panel</div><div class="d">Jurisdiction map, RTO &amp; talukas, form builder, publish worklist, monitor &amp; export.</div><span class="who">Headquarters</span></div>
+    </a>
+    <a class="card" style="--cc:#2f6bd6" href="ev-online-survey-part1.html">
+      <span class="cic"><span class="material-symbols-outlined">travel_explore</span></span>
+      <div><div class="t">Part 1 — Online Survey</div><div class="d">Satellite + Street View triage by IMV/AIMV; checking &amp; user permissions by Dy.RTO/ARTO.</div><span class="who">IMV / AIMV · Dy.RTO / ARTO</span></div>
+    </a>
+    <a class="card" style="--cc:#e08c00" href="ev-inspector-app.html">
+      <span class="cic"><span class="material-symbols-outlined">assignment</span></span>
+      <div><div class="t">Part 2 — Field Survey</div><div class="d">Pick a pending location, choose its type, fill the admin-built form on-site (photos + GPS, within 1&nbsp;km).</div><span class="who">IMV / AIMV (field)</span></div>
+    </a>
+  </div>
+  <p class="foot">All three apps read and write the same Firebase project (<b>ev-survey-mh</b>), so data entered in one appears in the others automatically.<br>Served over HTTPS via GitHub Pages — required for camera &amp; GPS to work.</p>
+</div>
+</body>
+</html>

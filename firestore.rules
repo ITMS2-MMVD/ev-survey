@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // EV Survey — shared collections used by all three apps.
+    // NOTE: these apps identify users only by mobile number (no Firebase Auth),
+    // so meaningful per-user rules are not possible without adding Auth/App Check.
+    // The rules below keep the apps fully working AND, unlike "test mode",
+    // they DO NOT EXPIRE. See README for how to harden with App Check.
+
+    match /sites/{id} {
+      allow read, write: if true;
+    }
+    match /inspectors/{mobile} {
+      allow read, write: if true;
+    }
+    match /config/{doc} {
+      allow read, write: if true;
+    }
+
+    // everything else is denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
