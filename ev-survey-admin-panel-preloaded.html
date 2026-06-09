@@ -502,7 +502,7 @@ async function cloudLoadConfig(){
       try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">cloud_done</span> Map colours & assignments loaded from cloud.',5000);}catch(e){}
       return true;
     }
-  }catch(e){}
+  }catch(e){syncStat('READ ERROR — '+(e&&e.message||e),true);}
   return false;
 }
 function loadState(){
@@ -1109,7 +1109,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v9 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v10 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1183,7 +1183,16 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     }catch(e){setStatus('Connection error',false);if(!silent)flash('<span class="material-symbols-outlined">error</span> '+(e.message||e));return false;}
   }
   try{var saved=JSON.parse(localStorage.getItem('ev_fb_cfg')||'null');if(saved){$('fbApiKey').value=saved.apiKey||'';$('fbAuthDomain').value=saved.authDomain||'';$('fbProjectId').value=saved.projectId||'';$('fbStorageBucket').value=saved.storageBucket||'';$('fbSenderId').value=saved.messagingSenderId||'';$('fbAppId').value=saved.appId||'';connect(true);}else{connect(true);}}catch(e){}
-  setTimeout(function(){try{if(!db)connect(true);if(db){Promise.resolve(cloudLoadConfig()).then(function(){_bootDone=true;},function(){_bootDone=true;});if(!(state.sites||[]).some(function(s){return s&&s.lat!=null;}))pullAllSites(true);}else{_bootDone=true;}}catch(e){_bootDone=true;}},1500);
+  setTimeout(function(){try{
+    if(!db)connect(true);
+    if(db){
+      syncStat('connected \u2014 reading map\u2026');
+      Promise.resolve(cloudLoadConfig()).then(function(){_bootDone=true;},function(err){_bootDone=true;syncStat('LOAD ERROR \u2014 '+((err&&err.message)||err),true);});
+      if(!(state.sites||[]).some(function(s){return s&&s.lat!=null;}))pullAllSites(true);
+    } else {
+      _bootDone=true; syncStat('NO Firebase connection on this device \u2014 check internet',true);
+    }
+  }catch(e){_bootDone=true;syncStat('boot error \u2014 '+(e.message||e),true);}},1500);
 
   /* ---- access-road filter (around-batched crossing test): tag bridges by ROAD passing underneath ---- */
   var _ACC_SKIP=/^(footway|path|cycleway|steps|pedestrian|bridleway|construction|proposed|raceway|corridor|elevator|platform|bus_guideway)$/;
