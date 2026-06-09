@@ -462,7 +462,7 @@ function cloudSaveConfig(){
   if(typeof db==='undefined'||!db||!_bootDone)return;
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
-    try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}},function(){});}catch(e){}
+    try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">cloud_done</span> Map settings synced to cloud.',2500);}catch(e){}},function(err){try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">error</span> Cloud sync FAILED: '+((err&&err.message)||err),9000);}catch(e){}});}catch(e){}
   },1500);
 }
 async function cloudLoadConfig(){
@@ -1099,7 +1099,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v7 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v8 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1430,8 +1430,10 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
     toast('<span class="material-symbols-outlined">map</span> Publishing jurisdiction map\u2026',true);
     try{
-      await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:Date.now()});
-      flash('<span class="material-symbols-outlined">cloud_done</span> Jurisdiction map published \u2014 inspectors load it on next open.');
+      var _now=Date.now();
+      await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:_now});
+      await db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:_now});
+      flash('<span class="material-symbols-outlined">cloud_done</span> Map pushed to cloud \u2014 it will load on every other device on next open.');
     }catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);}
   });
 
