@@ -474,11 +474,12 @@ function cloudSaveConfig(){
     try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(err){syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true);});}catch(e){}
   },1500);
 }
+function _withTimeout(pr,ms,label){return Promise.race([pr,new Promise(function(_,rej){setTimeout(function(){rej(new Error((label||'request')+' timed out (network blocking Firestore)'));},ms);})]);}
 async function cloudLoadConfig(){
   if(typeof db==='undefined'||!db)return false;
   try{
-    var aDoc=await db.collection('config').doc('adminState').get();
-    var jDoc=await db.collection('config').doc('jurisdiction').get();
+    var aDoc=await _withTimeout(db.collection('config').doc('adminState').get(),9000,'adminState read');
+    var jDoc=await _withTimeout(db.collection('config').doc('jurisdiction').get(),9000,'jurisdiction read');
     var aData=(aDoc&&aDoc.exists)?aDoc.data():null;
     var jData=(jDoc&&jDoc.exists)?jDoc.data():null;
     var aObj=null;if(aData){try{aObj=JSON.parse(aData.state||'{}');}catch(e){aObj=null;}}
@@ -1109,7 +1110,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v10 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v11 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1176,6 +1177,7 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     try{
       app=(firebase.apps&&firebase.apps.length)?firebase.app():firebase.initializeApp(cfg);
       db=firebase.firestore();
+      try{db.settings({experimentalForceLongPolling:true});}catch(e){}
       localStorage.setItem('ev_fb_cfg',JSON.stringify(cfg));
       setStatus('Connected · '+cfg.projectId,true);
       if(!silent)flash('<span class="material-symbols-outlined">cloud_done</span> Connected to '+cfg.projectId);
