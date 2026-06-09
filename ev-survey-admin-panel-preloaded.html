@@ -299,6 +299,8 @@
         <button class="btn ghost sm" id="fbPublishForms" style="margin-top:8px"><span class="material-symbols-outlined">dynamic_form</span>Publish survey forms</button>
         <button class="btn ghost sm" id="fbResync" style="margin-top:8px"><span class="material-symbols-outlined">sync_problem</span>Re-tag &amp; sync site RTOs</button>
         <button class="btn ghost sm" id="fbPull" style="margin-top:8px"><span class="material-symbols-outlined">cloud_download</span>Pull surveyed results</button>
+        <button class="btn ghost sm" id="fbPullAll" style="margin-top:8px"><span class="material-symbols-outlined">cloud_download</span>Load ALL locations from cloud</button>
+        <div class="hint">Use this on a new device (e.g. mobile) to pull the published worklist into the panel — the location list is stored per-device, so importing on one device doesn’t show on another until you load it here.</div>
         <button class="btn ghost sm" id="fbInspectors" style="margin-top:8px"><span class="material-symbols-outlined">groups</span>Download registered inspectors</button>
         <button class="btn ghost sm" id="fbCopyCfg" style="margin-top:8px"><span class="material-symbols-outlined">content_copy</span>Copy config for inspector app</button>
         <button class="btn ghost sm" id="fbResponses" style="margin-top:8px"><span class="material-symbols-outlined">table_view</span>View / export survey responses</button>
@@ -1235,6 +1237,24 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     if(typeof ensureForms==='function')ensureForms();
     try{await db.collection('config').doc('forms').set({forms:state.forms,updatedAt:Date.now()});flash('<span class="material-symbols-outlined">cloud_done</span> Survey forms published \u2014 field officers load them on next open.');}
     catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);}
+  });
+
+  var _pullAllBtn=document.getElementById('fbPullAll');
+  if(_pullAllBtn)_pullAllBtn.addEventListener('click',async function(){
+    if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
+    toast('<span class="material-symbols-outlined">cloud_download</span> Loading all locations from cloud\u2026',true);
+    try{
+      var snap=await db.collection('sites').get();
+      var byKey={};(state.sites||[]).forEach(function(s){byKey[siteKey(s)]=s;});
+      var add=0,upd=0;
+      snap.forEach(function(d){
+        var c=d.data();if(c.lat==null||c.lon==null)return;
+        var site=Object.assign({},c);site.id=d.id;site.formType=c.type||c.formType||'flyover';
+        if(byKey[d.id]){Object.assign(byKey[d.id],site);upd++;}else{state.sites.push(site);byKey[d.id]=site;add++;}
+      });
+      save();renderSites();
+      flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+(add+upd)+' locations from cloud ('+add+' new, '+upd+' updated).',7000);
+    }catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),7000);}
   });
 
   $('fbConnect').addEventListener('click',function(){connect(false);});
