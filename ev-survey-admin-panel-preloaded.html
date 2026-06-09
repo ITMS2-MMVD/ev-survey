@@ -468,19 +468,29 @@ function cloudSaveConfig(){
 async function cloudLoadConfig(){
   if(typeof db==='undefined'||!db)return false;
   try{
-    var d=await db.collection('config').doc('adminState').get();
-    if(d&&d.exists){
-      var c=d.data();var o=null;try{o=JSON.parse(c.state||'{}');}catch(e){o=null;}
-      if(o){
-        if(o.rtos&&o.rtos.length)state.rtos=o.rtos;
-        if(o.assign&&Object.keys(o.assign).length)state.assign=o.assign;
-        if(o.forms)state.forms=o.forms;
-        if(o.settings)state.settings=Object.assign(state.settings||{},o.settings);
-        _suppressCloudSave=true;try{save();}catch(e){}_suppressCloudSave=false;
-        try{refreshAll();}catch(e){}
-        try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">cloud_done</span> Settings & assignments loaded from cloud.',5000);}catch(e){}
-        return true;
-      }
+    var aDoc=await db.collection('config').doc('adminState').get();
+    var jDoc=await db.collection('config').doc('jurisdiction').get();
+    var aData=(aDoc&&aDoc.exists)?aDoc.data():null;
+    var jData=(jDoc&&jDoc.exists)?jDoc.data():null;
+    var aObj=null;if(aData){try{aObj=JSON.parse(aData.state||'{}');}catch(e){aObj=null;}}
+    var aT=aData?(aData.updatedAt||0):0;
+    var jT=jData?(jData.updatedAt||0):0;
+    var changed=false;
+    if(aObj){
+      if(aObj.rtos&&aObj.rtos.length){state.rtos=aObj.rtos;changed=true;}
+      if(aObj.assign&&Object.keys(aObj.assign).length){state.assign=aObj.assign;changed=true;}
+      if(aObj.forms){state.forms=aObj.forms;changed=true;}
+      if(aObj.settings){state.settings=Object.assign(state.settings||{},aObj.settings);changed=true;}
+    }
+    if(jData&&jT>=aT){
+      if(jData.rtos&&jData.rtos.length){state.rtos=jData.rtos;changed=true;}
+      try{var ja=JSON.parse(jData.assign||'{}');if(ja&&Object.keys(ja).length){state.assign=ja;changed=true;}}catch(e){}
+    }
+    if(changed){
+      _suppressCloudSave=true;try{save();}catch(e){}_suppressCloudSave=false;
+      try{refreshAll();}catch(e){}
+      try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">cloud_done</span> Map colours & assignments loaded from cloud.',5000);}catch(e){}
+      return true;
     }
   }catch(e){}
   return false;
