@@ -456,7 +456,35 @@ const DEFAULT_ASSIGN={"Ahmadnagar": "MH16", "Akola (Ahmednagar)": "MH16", "Karja
 let state={ rtos:[], assign:{}, forms:{}, settings:{radius:200}, sites:[] };
 state._talukas=null;
 function persistable(){return {rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings,sites:state.sites};}
-function save(){try{localStorage.setItem(LS,JSON.stringify(persistable()));}catch(e){}}
+var _suppressCloudSave=false,_cfgSaveT=null;
+function save(){try{localStorage.setItem(LS,JSON.stringify(persistable()));}catch(e){} try{if(!_suppressCloudSave)cloudSaveConfig();}catch(e){}}
+function cloudSaveConfig(){
+  if(typeof db==='undefined'||!db)return;
+  clearTimeout(_cfgSaveT);
+  _cfgSaveT=setTimeout(function(){
+    try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}},function(){});}catch(e){}
+  },1500);
+}
+async function cloudLoadConfig(){
+  if(typeof db==='undefined'||!db)return false;
+  try{
+    var d=await db.collection('config').doc('adminState').get();
+    if(d&&d.exists){
+      var c=d.data();var o=null;try{o=JSON.parse(c.state||'{}');}catch(e){o=null;}
+      if(o){
+        if(o.rtos&&o.rtos.length)state.rtos=o.rtos;
+        if(o.assign&&Object.keys(o.assign).length)state.assign=o.assign;
+        if(o.forms)state.forms=o.forms;
+        if(o.settings)state.settings=Object.assign(state.settings||{},o.settings);
+        _suppressCloudSave=true;try{save();}catch(e){}_suppressCloudSave=false;
+        try{refreshAll();}catch(e){}
+        try{if(typeof flash==='function')flash('<span class="material-symbols-outlined">cloud_done</span> Settings & assignments loaded from cloud.',5000);}catch(e){}
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
 function loadState(){
   try{const s=localStorage.getItem(LS);if(s){Object.assign(state,JSON.parse(s));}}catch(e){}
   if(!state.settings)state.settings={radius:200};
@@ -522,6 +550,7 @@ function initMap(){
   baseLight=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,attribution:'© OSM © CARTO'});
   siteLayer=(typeof L.markerClusterGroup==='function'?L.markerClusterGroup({maxClusterRadius:48,chunkedLoading:true,spiderfyOnMaxZoom:true,showCoverageOnHover:false}):L.layerGroup()).addTo(map);
   officeLayer=L.layerGroup().addTo(map);
+  try{var _mc=document.getElementById('map');if(_mc&&!document.getElementById('ptBadge')){var _bb=document.createElement('div');_bb.id='ptBadge';_bb.style.cssText='position:absolute;top:10px;right:12px;z-index:1200;background:rgba(19,32,29,.92);color:#fff;font:700 13px/1.2 sans-serif;padding:7px 11px;border-radius:9px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.35)';_bb.textContent='0 points on map';_mc.appendChild(_bb);}}catch(e){}
 }
 function renderOffices(){ if(officeLayer)officeLayer.clearLayers(); }
 const BASES={sat:()=>baseSat,light:()=>baseLight,
@@ -601,16 +630,22 @@ function retagSites(){ state.sites.forEach(s=>{ s.taluka=findTaluka(s.lat,s.lon)
 const PT={flyover:{c:'#e08c00',i:'route',t:'Flyover'},rto:{c:'#0969da',i:'account_balance',t:'RTO office'},msrtc:{c:'#1a7f37',i:'directions_bus',t:'MSRTC depot'}};
 const ACCC={kept:'#1a7f37',dropped:'#e5484d',unverified:'#8a94a6'};
 function renderSites(){
+  if(!siteLayer){ if(typeof map!=='undefined'&&map){ siteLayer=(typeof L.markerClusterGroup==='function'?L.markerClusterGroup({maxClusterRadius:48,chunkedLoading:true,spiderfyOnMaxZoom:true,showCoverageOnHover:false}):L.layerGroup()).addTo(map); } else { return; } }
   siteLayer.clearLayers();
+  try{if(map&&map.hasLayer&&!map.hasLayer(siteLayer))siteLayer.addTo(map);}catch(e){}
   const view=window._accView||'all';
+  let n=0;
   state.sites.forEach(s=>{
     if(view!=='all'&&s.accStatus!==view) return;
+    if(s.lat==null||s.lon==null||isNaN(+s.lat)||isNaN(+s.lon)) return;
     const done=s.status==='done'; let html;
     if(s.emoji){ html='<div class="emoji-pin">'+s.emoji+'</div>'; }
     else { const t=PT[s.formType]||PT.flyover; const bg=(s.accStatus&&ACCC[s.accStatus])?ACCC[s.accStatus]:t.c; html='<div class="site-pin" style="background:'+bg+';border-color:'+(done?'#093':'#fff')+'"><span class="material-symbols-outlined">'+t.i+'</span></div>'; }
-    L.marker([s.lat,s.lon],{icon:L.divIcon({className:'',html:html,iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:500})
+    L.marker([+s.lat,+s.lon],{icon:L.divIcon({className:'',html:html,iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:500})
       .bindPopup(siteBubble(s)).addTo(siteLayer);
+    n++;
   });
+  try{var b=document.getElementById('ptBadge');var mc=document.getElementById('map');if(!b&&mc){b=document.createElement('div');b.id='ptBadge';b.style.cssText='position:absolute;top:10px;right:12px;z-index:1200;background:rgba(19,32,29,.92);color:#fff;font:700 13px/1.2 sans-serif;padding:7px 11px;border-radius:9px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.35)';mc.appendChild(b);}if(b)b.textContent=n+' points on map';}catch(e){}
 }
 function siteBubble(s){
   const rto=state.rtos.find(r=>r.id===s.rto);
@@ -1127,7 +1162,7 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     }catch(e){setStatus('Connection error',false);if(!silent)flash('<span class="material-symbols-outlined">error</span> '+(e.message||e));return false;}
   }
   try{var saved=JSON.parse(localStorage.getItem('ev_fb_cfg')||'null');if(saved){$('fbApiKey').value=saved.apiKey||'';$('fbAuthDomain').value=saved.authDomain||'';$('fbProjectId').value=saved.projectId||'';$('fbStorageBucket').value=saved.storageBucket||'';$('fbSenderId').value=saved.messagingSenderId||'';$('fbAppId').value=saved.appId||'';connect(true);}else{connect(true);}}catch(e){}
-  setTimeout(function(){try{if(!db)connect(true);if(db&&!(state.sites||[]).some(function(s){return s&&s.lat!=null;}))pullAllSites(true);}catch(e){}},1500);
+  setTimeout(function(){try{if(!db)connect(true);if(db){cloudLoadConfig();if(!(state.sites||[]).some(function(s){return s&&s.lat!=null;}))pullAllSites(true);}}catch(e){}},1500);
 
   /* ---- access-road filter (around-batched crossing test): tag bridges by ROAD passing underneath ---- */
   var _ACC_SKIP=/^(footway|path|cycleway|steps|pedestrian|bridleway|construction|proposed|raceway|corridor|elevator|platform|bus_guideway)$/;
@@ -1241,22 +1276,22 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
   });
 
   async function pullAllSites(silent){
-    if(!db&&!connect(true)){if(!silent)flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return 0;}
-    if(!silent)toast('<span class="material-symbols-outlined">cloud_download</span> Loading all locations from cloud\u2026',true);
+    if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Cannot reach the cloud. Open with internet and try again.');return 0;}
+    flash('<span class="material-symbols-outlined">cloud_download</span> Loading locations from cloud\u2026',4000);
     try{
       var snap=await db.collection('sites').get();
       var byKey={};(state.sites||[]).forEach(function(s){byKey[siteKey(s)]=s;});
-      var add=0,upd=0;
+      var add=0,upd=0,bad=0;
       snap.forEach(function(d){
-        var c=d.data();if(c.lat==null||c.lon==null)return;
-        var site=Object.assign({},c);site.id=d.id;site.formType=c.type||c.formType||'flyover';
+        var c=d.data();if(c.lat==null||c.lon==null||isNaN(+c.lat)||isNaN(+c.lon)){bad++;return;}
+        var site=Object.assign({},c);site.id=d.id;site.lat=+c.lat;site.lon=+c.lon;site.formType=c.type||c.formType||'flyover';
         if(byKey[d.id]){Object.assign(byKey[d.id],site);upd++;}else{state.sites.push(site);byKey[d.id]=site;add++;}
       });
       save();renderSites();
-      if(!silent)flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+(add+upd)+' locations from cloud ('+add+' new, '+upd+' updated).',7000);
-      else if(add)flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+add+' locations from the cloud for this device.',6000);
+      try{if(siteLayer&&siteLayer.getBounds&&(add+upd)>0){var bb=siteLayer.getBounds();if(bb&&bb.isValid())map.fitBounds(bb,{maxZoom:9,padding:[28,28]});}}catch(e){}
+      flash('<span class="material-symbols-outlined">cloud_done</span> Cloud has '+snap.size+' locations \u2014 loaded '+(add+upd)+' onto the map'+(bad?(' ('+bad+' had no coordinates)'):'')+'.',9000);
       return add+upd;
-    }catch(e){if(!silent)flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),7000);return 0;}
+    }catch(e){flash('<span class="material-symbols-outlined">error</span> Load failed: '+(e.message||e),9000);return 0;}
   }
   var _pullAllBtn=document.getElementById('fbPullAll');
   if(_pullAllBtn)_pullAllBtn.addEventListener('click',function(){pullAllSites(false);});
