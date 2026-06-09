@@ -1127,6 +1127,7 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     }catch(e){setStatus('Connection error',false);if(!silent)flash('<span class="material-symbols-outlined">error</span> '+(e.message||e));return false;}
   }
   try{var saved=JSON.parse(localStorage.getItem('ev_fb_cfg')||'null');if(saved){$('fbApiKey').value=saved.apiKey||'';$('fbAuthDomain').value=saved.authDomain||'';$('fbProjectId').value=saved.projectId||'';$('fbStorageBucket').value=saved.storageBucket||'';$('fbSenderId').value=saved.messagingSenderId||'';$('fbAppId').value=saved.appId||'';connect(true);}else{connect(true);}}catch(e){}
+  setTimeout(function(){try{if(!db)connect(true);if(db&&!(state.sites||[]).some(function(s){return s&&s.lat!=null;}))pullAllSites(true);}catch(e){}},1500);
 
   /* ---- access-road filter (around-batched crossing test): tag bridges by ROAD passing underneath ---- */
   var _ACC_SKIP=/^(footway|path|cycleway|steps|pedestrian|bridleway|construction|proposed|raceway|corridor|elevator|platform|bus_guideway)$/;
@@ -1239,10 +1240,9 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);}
   });
 
-  var _pullAllBtn=document.getElementById('fbPullAll');
-  if(_pullAllBtn)_pullAllBtn.addEventListener('click',async function(){
-    if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
-    toast('<span class="material-symbols-outlined">cloud_download</span> Loading all locations from cloud\u2026',true);
+  async function pullAllSites(silent){
+    if(!db&&!connect(true)){if(!silent)flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return 0;}
+    if(!silent)toast('<span class="material-symbols-outlined">cloud_download</span> Loading all locations from cloud\u2026',true);
     try{
       var snap=await db.collection('sites').get();
       var byKey={};(state.sites||[]).forEach(function(s){byKey[siteKey(s)]=s;});
@@ -1253,9 +1253,13 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
         if(byKey[d.id]){Object.assign(byKey[d.id],site);upd++;}else{state.sites.push(site);byKey[d.id]=site;add++;}
       });
       save();renderSites();
-      flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+(add+upd)+' locations from cloud ('+add+' new, '+upd+' updated).',7000);
-    }catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),7000);}
-  });
+      if(!silent)flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+(add+upd)+' locations from cloud ('+add+' new, '+upd+' updated).',7000);
+      else if(add)flash('<span class="material-symbols-outlined">cloud_done</span> Loaded '+add+' locations from the cloud for this device.',6000);
+      return add+upd;
+    }catch(e){if(!silent)flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),7000);return 0;}
+  }
+  var _pullAllBtn=document.getElementById('fbPullAll');
+  if(_pullAllBtn)_pullAllBtn.addEventListener('click',function(){pullAllSites(false);});
 
   $('fbConnect').addEventListener('click',function(){connect(false);});
 
