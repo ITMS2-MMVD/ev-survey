@@ -476,6 +476,7 @@ function cloudSaveConfig(){
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
     var body=JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings});
+    try{_fsWrite('config/forms',{formsJson:{stringValue:JSON.stringify(state.forms)},updatedAt:{integerValue:String(Date.now())}}).catch(function(){});}catch(e){}
     _fsWrite('config/adminState',{state:{stringValue:body},updatedAt:{integerValue:String(Date.now())}}).then(
       function(){syncStat('settings SAVED '+new Date().toLocaleTimeString());},
       function(err){ if(typeof db!=='undefined'&&db){ db.collection('config').doc('adminState').set({state:body,updatedAt:Date.now()}).then(function(){syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(e2){syncStat('SAVE FAILED \u2014 '+((e2&&e2.message)||e2),true);}); } else { syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true); } });
@@ -806,21 +807,42 @@ document.getElementById('addQ').addEventListener('click',()=>{state.forms[curTyp
 document.getElementById('loadPremade').addEventListener('click',()=>{if(confirm('Replace the current '+curType+' form with the premade version?')){state.forms[curType]=PREMADE[curType]();save();renderForm();}});
 document.querySelectorAll('.typetab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.typetab').forEach(x=>x.classList.remove('on'));t.classList.add('on');curType=t.dataset.ftype;renderForm();}));
 function renderPreview(){
-  const list=state.forms[curType];
+  ensureForms();
+  var PVC={flyover:{c:'#e08c00',i:'route',t:'Flyover'},rto:{c:'#2f6bd6',i:'account_balance',t:'RTO premises'},msrtc:{c:'#1f8a52',i:'directions_bus',t:'MSRTC depot'}};
+  var th=PVC[curType]||PVC.flyover;
+  function normF(f){
+    if(!f||f.type==='gps_photo')return null;
+    var ty=f.type||'text';var o=(f.options||[]).slice();
+    if(ty==='toggle'){ty='select';o=['Yes','No'];}
+    if(ty==='radio'||ty==='multi')ty='select';
+    if(ty!=='select'&&ty!=='number')ty='text';
+    return {l:f.label,t:ty,o:o,ph:f.help||'',req:f.required};
+  }
+  var flds=(state.forms[curType]||[]).map(normF).filter(Boolean);
+  var dyn=flds.map(function(f){
+    var inp=f.t==='select'
+      ? '<select class="field" disabled><option>Select\u2026</option>'+f.o.map(function(x){return '<option>'+esc(x)+'</option>';}).join('')+'</select>'
+      : '<input class="field" disabled '+(f.t==='number'?'inputmode="numeric"':'')+' placeholder="'+esc(f.ph||'')+'">';
+    return '<label class="pl" style="display:block;margin:10px 0 4px;font-weight:600;font-size:13px">'+esc(f.l)+(f.req?' <b style="color:#c53030">*</b>':'')+'</label>'+inp;
+  }).join('');
+  var skipped=(state.forms[curType]||[]).filter(function(f){return f&&f.type==='gps_photo';}).length;
   document.getElementById('pvBody').innerHTML=
-    '<div class="banner" style="margin:0 0 12px"><span class="material-symbols-outlined">my_location</span><span>GPS auto-captured · accepted within '+(state.settings.radius||200)+' m of site</span></div>'+
-    list.map(q=>{
-      let ctrl='';
-      if(q.type==='text')ctrl='<input type="text" disabled>';
-      else if(q.type==='textarea')ctrl='<textarea disabled></textarea>';
-      else if(q.type==='number')ctrl='<input type="number" disabled placeholder="'+((q.min??'')+(q.max!=null?' – '+q.max:''))+'">';
-      else if(q.type==='select')ctrl='<select disabled><option>— select —</option>'+(q.options||[]).map(o=>'<option>'+esc(o)+'</option>').join('')+'</select>';
-      else if(q.type==='radio')ctrl=(q.options||[]).map(o=>'<label style="display:block;font-size:13px;color:#414941"><input type="radio" disabled> '+esc(o)+'</label>').join('');
-      else if(q.type==='multi')ctrl=(q.options||[]).map(o=>'<label style="display:block;font-size:13px;color:#414941"><input type="checkbox" disabled> '+esc(o)+'</label>').join('');
-      else if(q.type==='toggle')ctrl='<label style="font-size:13px;color:#414941"><input type="checkbox" disabled> Yes / No</label>';
-      else if(q.type==='gps_photo')ctrl='<div class="pv-photo"><span class="material-symbols-outlined">add_a_photo</span>Capture photo — GPS &amp; time auto-embedded</div>';
-      return '<div class="pv-q"><div class="pl">'+esc(q.label)+(q.required?' <b>*</b>':'')+'</div>'+ctrl+(q.help?'<div style="font-size:11px;color:#717971;margin-top:5px">'+esc(q.help)+'</div>':'')+'</div>';
-    }).join('');
+    '<div style="border:1px solid #e3e8ef;border-radius:14px;overflow:hidden;background:#fff">'
+    +'<div style="background:'+th.c+';color:#fff;padding:10px 14px;display:flex;align-items:center;gap:8px;font-weight:700"><span class="material-symbols-outlined">'+th.i+'</span>'+th.t+' survey</div>'
+    +'<div style="padding:12px 14px">'
+    +'<label class="pl" style="display:block;margin:2px 0 4px;font-weight:600;font-size:13px">Location name <b style="color:#c53030">*</b></label><input class="field" disabled placeholder="e.g. Vashi Flyover">'
+    +'<label class="pl" style="display:block;margin:10px 0 4px;font-weight:600;font-size:13px">GPS coordinates <b style="color:#c53030">*</b></label>'
+    +'<div style="display:flex;gap:6px"><input class="field" disabled placeholder="Latitude"><input class="field" disabled placeholder="Longitude"></div>'
+    +'<button class="btn sec" disabled style="margin-top:8px;opacity:.85"><span class="material-symbols-outlined">my_location</span>Use my current location</button>'
+    +dyn
+    +'<label class="pl" style="display:block;margin:10px 0 4px;font-weight:600;font-size:13px">Remarks</label><textarea class="field" disabled rows="2" placeholder="Any notes for the survey team\u2026"></textarea>'
+    +'<label class="pl" style="display:block;margin:10px 0 4px;font-weight:600;font-size:13px">Site photos <b style="color:#c53030">*</b> <span style="color:#717971;font-weight:400">(0/5)</span></label>'
+    +'<button class="btn sec" disabled style="opacity:.85"><span class="material-symbols-outlined">photo_camera</span>Take photo</button>'
+    +'<div style="font-size:11px;color:#717971;margin-top:5px">Opens the camera directly \u2014 gallery upload is not allowed. GPS is captured with each photo and must be within 1 km of the survey point. Up to 5 photos.</div>'
+    +'<button class="btn" disabled style="margin-top:12px;background:'+th.c+';border-color:'+th.c+';opacity:.9"><span class="material-symbols-outlined">check_circle</span>Submit survey</button>'
+    +'</div></div>'
+    +(skipped?('<div style="font-size:11px;color:#9a6700;background:#fff8e6;border:1px solid #f2d77e;border-radius:8px;padding:6px 9px;margin-top:10px">'+skipped+' \u201cGPS photo\u201d question(s) are not shown as separate fields \u2014 photos are handled by the built-in camera section above.</div>'):'')
+    +'<div style="font-size:11px;color:#717971;margin-top:8px">Exact replica of the IMV/AIMV phone screen for this point type. Publish forms to push changes live.</div>';
 }
 
 /* ---------- data view ---------- */

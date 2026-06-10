@@ -475,6 +475,7 @@ function cloudSaveConfig(){
   if(!_cloudLoaded)return; /* never overwrite cloud with stale local state */
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
+    try{_fsWrite('config/forms',{formsJson:{stringValue:JSON.stringify(state.forms)},updatedAt:{integerValue:String(Date.now())}}).catch(function(){});}catch(e){}
     try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(err){syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true);});}catch(e){}
   },1500);
 }
