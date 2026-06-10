@@ -426,7 +426,7 @@ async function doSignup(){
     const ref=db.collection('inspectors').doc(mobile),snap=await ref.get();
     if(snap.exists){setMsg('signupMsg','err','This mobile is already registered. Use Login.');btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">person_add</span>Sign up';return;}
     const r=rtoById(office),prof={name,mobile,designation:desig,office,officeName:r?r.name:office,createdAt:Date.now()};
-    prof.allowedParts=(desig==='IMV'||desig==='AIMV')?{part1:false,part2:true}:{part1:true,part2:true};
+    prof.allowedParts={part1:true,part2:true};
     await ref.set(prof);localStorage.setItem('ev_triage_mobile',mobile);enterApp(prof);
   }catch(e){setMsg('signupMsg','err','Sign up failed: '+(e.message||e));btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">person_add</span>Sign up';}
 }
@@ -760,7 +760,7 @@ async function approveEntry(id){var s=state.sites.find(function(x){return x.id==
 async function rejectEntry(id){var s=state.sites.find(function(x){return x.id===id;});if(!s)return;var rem=prompt('Reason to send back to the inspector (optional):');if(rem===null)return;var prev=s.checkStatus;s.checkStatus='rejected';renderCheck();try{await db.collection('sites').doc(id).update({checkStatus:'rejected',checkRemark:rem||'',checkedBy:state.profile.mobile,checkedByName:state.profile.name,checkedAt:Date.now()});toast('<span class="material-symbols-outlined">undo</span> Sent back to inspector.');}catch(e){s.checkStatus=prev;renderCheck();toast('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),4000);}}
 async function undoEntry(id){var s=state.sites.find(function(x){return x.id===id;});if(!s)return;var prev=s.checkStatus;s.checkStatus='pending';renderCheck();try{await db.collection('sites').doc(id).update({checkStatus:'pending',checkedBy:null,checkedByName:null,checkedAt:null});toast('<span class="material-symbols-outlined">restart_alt</span> Moved back to pending.');}catch(e){s.checkStatus=prev;renderCheck();toast('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),4000);}}
 window.setCheckFilter=setCheckFilter;window.approveEntry=approveEntry;window.rejectEntry=rejectEntry;window.undoEntry=undoEntry;
-function allowedPart1(){if(isChecker())return true;var ap=state.profile&&state.profile.allowedParts;return !!(ap&&ap.part1===true);}
+function allowedPart1(){return true; /* Part 1 survey open to all enrolled users by policy */}
 function onlyPotentialView(){if(isChecker())return false;if(allowedPart1())return false;var ap=state.profile&&state.profile.allowedParts;return !ap||ap.part2!==false;}
 async function gpApprove(){var id=window._mpId;if(!id)return;await approveEntry(id);var order=listForView();var idx=order.findIndex(function(x){return x.id===id;});var next=(idx>=0&&idx+1<order.length)?order[idx+1]:null;if(window._gpMap){window._gpMap.remove();window._gpMap=null;window._gpMk=null;}var dl=document.getElementById('locDlg');if(dl)dl.classList.remove('on');setTimeout(function(){if(next)openLoc(next.id);else toast('<span class="material-symbols-outlined">task_alt</span> End of list \u2014 all checked.',2400);},150);}
 async function gpSendBack(){var id=window._mpId;if(!id)return;await rejectEntry(id);renderGpCats();}
@@ -775,7 +775,7 @@ async function renderUsers(){
     makers.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
     if(!makers.length){wrap.innerHTML='<div class="empty"><span class="material-symbols-outlined" style="font-size:34px;color:#bcc6d2">group_off</span><br>No IMV / AIMV registered in your office yet.</div>';return;}
     wrap.innerHTML=makers.map(function(u){
-      var ap=u.allowedParts||{part1:false,part2:true};
+      var ap=Object.assign({part1:true,part2:true},u.allowedParts||{});if(ap.part1!==false)ap.part1=true;
       function tgl(part,on){var c=on?'#1f8a52':'#9aa6b6';var bg=on?'#e6f4ef':'#f3f5f8';var bd=on?'#1f8a52':'#dce3ec';return '<button onclick="setUserPart(\''+u.mobile+'\',\''+part+'\','+(!on)+')" style="flex:1;border:1px solid '+bd+';background:'+bg+';color:'+c+';border-radius:9px;padding:8px;font-weight:700;font-family:inherit;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px"><span class="material-symbols-outlined">'+(on?'toggle_on':'toggle_off')+'</span>'+(part==='part1'?'Part 1 (online)':'Part 2 (field)')+'</button>';}
       return '<div class="loc"><div class="top"><div class="ic" style="background:#0e5f54"><span class="material-symbols-outlined" style="font-size:17px">badge</span></div><div class="gi"><div class="nm">'+escAttr(u.name||u.mobile)+'</div><div class="sub">'+escAttr(u.designation||'')+' \u00b7 '+u.mobile+'</div></div></div><div style="display:flex;gap:8px;padding:8px 12px 12px">'+tgl('part1',ap.part1===true)+tgl('part2',ap.part2!==false)+'</div></div>';
     }).join('');
@@ -783,7 +783,7 @@ async function renderUsers(){
 }
 async function setUserPart(mobile,part,val){
   if(!db)return;
-  try{var ref=db.collection('inspectors').doc(mobile);var snap=await ref.get();var ap=(snap.exists&&snap.data().allowedParts)||{part1:false,part2:true};ap[part]=val;await ref.update({allowedParts:ap});toast('<span class="material-symbols-outlined">check</span> Updated.');renderUsers();}
+  try{var ref=db.collection('inspectors').doc(mobile);var snap=await ref.get();var ap=Object.assign({part1:true,part2:true},(snap.exists&&snap.data().allowedParts)||{});ap[part]=val;await ref.update({allowedParts:ap});toast('<span class="material-symbols-outlined">check</span> Updated.');renderUsers();}
   catch(e){toast('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),4000);}
 }
 window.gpApprove=gpApprove;window.gpSendBack=gpSendBack;window.setUserPart=setUserPart;
