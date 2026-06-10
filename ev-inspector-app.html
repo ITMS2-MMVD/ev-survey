@@ -320,18 +320,28 @@ function fillOffices(filterStr){
 }
 function refreshRtoList(){
   try{
-    fetch('https://firestore.googleapis.com/v1/projects/ev-survey-mh/databases/(default)/documents/config/jurisdiction')
-    .then(function(r){return r.ok?r.json():null;})
-    .then(function(j){
-      if(!j||!j.fields)return;
-      var list=null;
-      if(j.fields.rtosJson&&j.fields.rtosJson.stringValue){try{list=JSON.parse(j.fields.rtosJson.stringValue);}catch(e){}}
-      if(!list&&j.fields.rtos&&j.fields.rtos.arrayValue&&j.fields.rtos.arrayValue.values){
-        list=j.fields.rtos.arrayValue.values.map(function(v){var f=(v.mapValue&&v.mapValue.fields)||{};return {id:f.id&&f.id.stringValue,name:f.name&&f.name.stringValue,color:(f.color&&f.color.stringValue)||'#888'};}).filter(function(r){return r.id&&r.name;});
+    var B='https://firestore.googleapis.com/v1/projects/ev-survey-mh/databases/(default)/documents/config/';
+    function gf(u){return fetch(u).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});}
+    function ts(j){if(!j||!j.fields||!j.fields.updatedAt)return 0;var u=j.fields.updatedAt;return +(u.integerValue||u.doubleValue||0);}
+    Promise.all([gf(B+'jurisdiction'),gf(B+'adminState')]).then(function(rs){
+      var j=rs[0],a=rs[1];var jT=ts(j),aT=ts(a);
+      var list=null,assign=null;
+      if(j&&j.fields){
+        if(j.fields.rtosJson&&j.fields.rtosJson.stringValue){try{list=JSON.parse(j.fields.rtosJson.stringValue);}catch(e){}}
+        if(!list&&j.fields.rtos&&j.fields.rtos.arrayValue&&j.fields.rtos.arrayValue.values){
+          list=j.fields.rtos.arrayValue.values.map(function(v){var f=(v.mapValue&&v.mapValue.fields)||{};return {id:f.id&&f.id.stringValue,name:f.name&&f.name.stringValue,color:(f.color&&f.color.stringValue)||'#888'};}).filter(function(r){return r.id&&r.name;});
+        }
+        if(j.fields.assign&&j.fields.assign.stringValue){try{assign=JSON.parse(j.fields.assign.stringValue);}catch(e){}}
+      }
+      if(a&&a.fields&&a.fields.state&&a.fields.state.stringValue&&aT>=jT){
+        try{var st=JSON.parse(a.fields.state.stringValue);
+          if(st&&st.rtos&&st.rtos.length)list=st.rtos;
+          if(st&&st.assign&&Object.keys(st.assign).length)assign=st.assign;
+        }catch(e){}
       }
       if(list&&list.length){LIVE_RTOS=list;fillOffices();}
-      if(j.fields.assign&&j.fields.assign.stringValue){try{state.assignMap=JSON.parse(j.fields.assign.stringValue);}catch(e){}}
-    }).catch(function(){});
+      if(assign){state.assignMap=assign;}
+    });
   }catch(e){}
 }
 function myTalukas(){const id=state.profile.office;const A=ASSIGN();return Object.keys(A).filter(k=>A[k]===id);}
