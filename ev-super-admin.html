@@ -1110,7 +1110,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v1 \u00b7 map authoring';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v2 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1451,8 +1451,37 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
       try{ await _fsWrite('config/adminState',{state:{stringValue:stBody},updatedAt:{integerValue:String(_now)}}); }
       catch(eRest){ if(typeof db!=='undefined'&&db){ await db.collection('config').doc('adminState').set({state:stBody,updatedAt:_now}); } else { throw eRest; } }
       try{ if((typeof db!=='undefined'&&db)||connect(true)) await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:_now}); }catch(eJ){}
-      flash('<span class="material-symbols-outlined">cloud_done</span> Map pushed to cloud \u2014 the Admin app will show it on next open / Reload.');
-      syncStat('map PUBLISHED '+new Date().toLocaleTimeString());
+      // Re-tag every cloud point so Part 1 / Part 2 officers see them under the NEW RTO
+      var retagged=0, scanned=0;
+      try{
+        if(!db)connect(true);
+        if(db){
+          syncStat('retagging points to new RTOs\u2026');
+          var snap=await db.collection('sites').get();
+          var batch=db.batch(), inB=0;
+          var docs=[]; snap.forEach(function(d){docs.push(d);});
+          for(var i=0;i<docs.length;i++){
+            var d=docs[i], c=d.data(); scanned++;
+            if(c.lat==null||c.lon==null) continue;
+            var tk=findTaluka(+c.lat,+c.lon);
+            var newRto=tk?(state.assign[tk]||null):null;
+            if(newRto && (c.rto!==newRto || c.taluka!==tk)){
+              batch.update(d.ref,{rto:newRto,taluka:tk||c.taluka||null});
+              retagged++; inB++;
+              if(inB>=400){ await batch.commit(); batch=db.batch(); inB=0; syncStat('retagging\u2026 '+retagged+' updated'); }
+            }
+          }
+          if(inB>0) await batch.commit();
+          // local copy too
+          (state.sites||[]).forEach(function(s){ if(s&&s.lat!=null){ var t2=findTaluka(+s.lat,+s.lon); if(t2){ s.taluka=t2; s.rto=state.assign[t2]||s.rto; } } });
+          _suppressCloudSave=true; try{save();}catch(e){} _suppressCloudSave=false;
+          try{renderSites();}catch(e){}
+        } else {
+          syncStat('map saved, but points NOT retagged (no SDK connection) \u2014 retry on laptop',true);
+        }
+      }catch(eR){ syncStat('point retag FAILED \u2014 '+((eR&&eR.message)||eR),true); }
+      flash('<span class="material-symbols-outlined">cloud_done</span> Map published. '+retagged+' of '+scanned+' points moved to their new RTO \u2014 Part 1 & Part 2 officers will see them on next login/refresh.',9000);
+      syncStat('map PUBLISHED \u00b7 '+retagged+' points retagged \u00b7 '+new Date().toLocaleTimeString());
     }catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);syncStat('PUBLISH FAILED \u2014 '+(e.message||e),true);}
   });
   var _pj=document.getElementById('fbPullJur');
