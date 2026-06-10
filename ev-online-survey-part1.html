@@ -350,12 +350,36 @@ let db=null,cfgOk=false;
 function toast(m,ms){const t=document.getElementById('toast');t.innerHTML=m;t.classList.add('show');clearTimeout(t._t);if(ms!==0)t._t=setTimeout(()=>t.classList.remove('show'),ms||2400);}
 function norm(m){return String(m||'').replace(/\D/g,'').slice(-10);}
 function validMobile(m){return /^[6-9]\d{9}$/.test(m);}
-function rtoById(id){return DEFAULT_RTOS.find(r=>r.id===id);}
+function rtoById(id){return (LIVE_RTOS.find(r=>r.id===id))||DEFAULT_RTOS.find(r=>r.id===id);}
+var LIVE_RTOS=DEFAULT_RTOS.slice();
+function fillOffices(){
+  var sel=document.getElementById('suOffice');if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">Select your office\u2026</option>';
+  LIVE_RTOS.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
+  if(cur)sel.value=cur;
+}
+function refreshRtoList(){
+  try{
+    fetch('https://firestore.googleapis.com/v1/projects/ev-survey-mh/databases/(default)/documents/config/jurisdiction')
+    .then(function(r){return r.ok?r.json():null;})
+    .then(function(j){
+      if(!j||!j.fields)return;
+      var list=null;
+      if(j.fields.rtosJson&&j.fields.rtosJson.stringValue){try{list=JSON.parse(j.fields.rtosJson.stringValue);}catch(e){}}
+      if(!list&&j.fields.rtos&&j.fields.rtos.arrayValue&&j.fields.rtos.arrayValue.values){
+        list=j.fields.rtos.arrayValue.values.map(function(v){var f=(v.mapValue&&v.mapValue.fields)||{};return {id:f.id&&f.id.stringValue,name:f.name&&f.name.stringValue,color:(f.color&&f.color.stringValue)||'#888'};}).filter(function(r){return r.id&&r.name;});
+      }
+      if(list&&list.length){LIVE_RTOS=list;fillOffices();}
+      if(j.fields.assign&&j.fields.assign.stringValue){try{state.assignMap=JSON.parse(j.fields.assign.stringValue);}catch(e){}}
+    }).catch(function(){});
+  }catch(e){}
+}
 function myTalukas(){const id=state.profile.office,A=ASSIGN();return Object.keys(A).filter(k=>A[k]===id);}
 
 function boot(){
-  const sel=document.getElementById('suOffice');
-  DEFAULT_RTOS.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
+  fillOffices();
+  refreshRtoList();
   cfgOk=firebaseConfig.apiKey&&firebaseConfig.apiKey.indexOf('PASTE')<0;
   if(cfgOk){try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();}catch(e){console.error(e);cfgOk=false;}}
   document.getElementById('boot').classList.add('hidden');
@@ -412,7 +436,7 @@ async function enterApp(prof){
   var _chk=isChecker();var _sc=document.getElementById('segCheck');if(_sc)_sc.style.display=_chk?'':'none';var _su=document.getElementById('segUsers');if(_su)_su.style.display=_chk?'':'none';showView(_chk?'check':'map');
   if(onlyPotentialView())toast('<span class="material-symbols-outlined">filter_alt</span> Showing “Submit for Offline Survey” sites only (Part 2).',3200);
 }
-async function loadJurisdiction(){if(!db)return;try{const snap=await db.collection('config').doc('jurisdiction').get();if(snap.exists){const d=snap.data();if(d&&d.assign){try{state.assignMap=JSON.parse(d.assign);}catch(_){}}}}catch(e){console.error(e);}}
+async function loadJurisdiction(){if(!db)return;try{const snap=await db.collection('config').doc('jurisdiction').get();if(snap.exists){const d=snap.data();if(d&&d.assign){try{state.assignMap=JSON.parse(d.assign);}catch(_){}}if(d&&d.rtosJson){try{var L=JSON.parse(d.rtosJson);if(L&&L.length){LIVE_RTOS=L;fillOffices();}}catch(_){}}else if(d&&d.rtos&&d.rtos.length){LIVE_RTOS=d.rtos;fillOffices();}}}catch(e){console.error(e);}}
 
 function initMap(){
   if(map)return;

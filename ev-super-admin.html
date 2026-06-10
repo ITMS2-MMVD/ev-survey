@@ -728,7 +728,9 @@ function renderRtos(){
 document.getElementById('addRto').addEventListener('click',()=>{
   const i=document.getElementById('rtoName');const nm=i.value.trim();if(!nm)return;
   const c=map.getCenter();
-  state.rtos.push({id:'r'+Date.now().toString(36),name:nm,color:rtoColor(state.rtos.length),lat:+c.lat.toFixed(5),lon:+c.lng.toFixed(5)});
+  var _m=nm.match(/MH[\s-]?0*(\d+)/i);var _nid=_m?('MH'+(_m[1].length<2?'0':'')+_m[1]):('R'+nm.replace(/[^A-Za-z0-9]/g,'').slice(0,10).toUpperCase());
+  if(state.rtos.some(function(r){return r.id===_nid;})){var _sfx=2;while(state.rtos.some(function(r){return r.id===_nid+'_'+_sfx;}))_sfx++;_nid=_nid+'_'+_sfx;}
+  state.rtos.push({id:_nid,name:nm,color:rtoColor(state.rtos.length),lat:+c.lat.toFixed(5),lon:+c.lng.toFixed(5)});
   i.value='';save();renderRtos();renderLegend();renderAssign();renderOffices();
 });
 document.getElementById('radius').addEventListener('change',e=>{state.settings.radius=+e.target.value||200;save();});
@@ -1110,7 +1112,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v2 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v3 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1450,7 +1452,7 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
       var stBody=JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings});
       try{ await _fsWrite('config/adminState',{state:{stringValue:stBody},updatedAt:{integerValue:String(_now)}}); }
       catch(eRest){ if(typeof db!=='undefined'&&db){ await db.collection('config').doc('adminState').set({state:stBody,updatedAt:_now}); } else { throw eRest; } }
-      try{ if((typeof db!=='undefined'&&db)||connect(true)) await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:_now}); }catch(eJ){}
+      try{ if((typeof db!=='undefined'&&db)||connect(true)) await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,rtosJson:JSON.stringify(state.rtos),updatedAt:_now}); }catch(eJ){}
       // Re-tag every cloud point so Part 1 / Part 2 officers see them under the NEW RTO
       var retagged=0, scanned=0;
       try{
