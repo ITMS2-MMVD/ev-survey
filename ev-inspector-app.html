@@ -112,6 +112,12 @@ input,select,textarea{font-family:inherit;font-size:15px}
   #formHdr>.material-symbols-outlined{font-size:22px}
   #formHdr button{background:rgba(255,255,255,.22);border:none;color:#fff;border-radius:8px;padding:6px 10px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12.5px}
   #formBody.themed #submitBtn{background:var(--cc)}
+
+/* ===== phone-frame: mobile view is the only view, even on desktop ===== */
+@media(min-width:701px){
+  html{background:#dde4ec}
+  body{max-width:430px;margin:0 auto;box-shadow:0 0 44px rgba(15,30,40,.28);min-height:100vh;position:relative}
+}
 </style>
 </head>
 <body>

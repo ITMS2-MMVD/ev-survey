@@ -92,8 +92,8 @@ input,select,textarea{font-family:inherit;font-size:15px}
 .mpFrame{flex:1;border:0;width:100%}
 .mpCats{display:flex;gap:8px;padding:12px;flex-wrap:wrap;background:var(--card);border-top:1px solid var(--line)}
 .mpCats .catbtn{flex:1;min-width:calc(50% - 4px)}
-@media(min-width:761px){#viewList.withmp .pad{max-width:50%}}
-@media(max-width:760px){.mp{left:0}}
+/* desktop split removed — mobile-only layout */
+.mp{left:0}
 .cfov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:none;align-items:center;justify-content:center;padding:20px}
 .cfov.on{display:flex}
 .cfbox{background:#fff;border-radius:16px;padding:20px;max-width:390px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)}
@@ -137,7 +137,7 @@ input,select,textarea{font-family:inherit;font-size:15px}
 .gpSplit{display:flex;gap:12px;height:min(400px,56vh);margin:8px 0}
 .gpMap{width:100%;height:100%}
 .gpSv{flex:1;height:100%;border:0;border-radius:10px;background:#000;display:block}
-@media(max-width:640px){.gpSplit{flex-direction:column;height:auto}.gpMap{height:min(240px,30vh)}.gpSv{height:min(170px,22vh)}}
+.gpSplit{flex-direction:column;height:auto}.gpMap{height:min(240px,30vh)}.gpSv{height:min(170px,22vh)}
 .gpCoords{font-size:13px;color:#5b6675;margin:2px 0}
 .mppin{background:none;border:none}
 .mppin svg{display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
@@ -166,7 +166,14 @@ input,select,textarea{font-family:inherit;font-size:15px}
 .gpNavb:hover{background:#eceff3}
 .gpSkip{background:#fff3e0;border-color:#e0a23c;color:#a85f00}
 .gpSkip:hover{background:#ffe9c7}
-@media(max-width:760px){.gpSplit3{flex-direction:column;height:auto}.gpSplit3 .gpMapWrap2,.gpSplit3 .gpSv,.gpSplit3 .gpSvWrap{height:min(240px,30vh)}.gpCatsCol{flex:0 0 auto}}
+.gpSplit3{flex-direction:column;height:auto}.gpSplit3 .gpMapWrap2,.gpSplit3 .gpSv,.gpSplit3 .gpSvWrap{height:min(240px,30vh)}.gpCatsCol{flex:0 0 auto}
+.cfov>*{max-width:min(430px,94vw)}
+
+/* ===== phone-frame: mobile view is the only view, even on desktop ===== */
+@media(min-width:701px){
+  html{background:#dde4ec}
+  body{max-width:430px;margin:0 auto;box-shadow:0 0 44px rgba(15,30,40,.28);min-height:100vh;position:relative}
+}
 </style>
 </head>
 <body>
