@@ -202,6 +202,7 @@ input,select,textarea{font-family:inherit;font-size:15px}
         <option value="ARTO">ARTO — Assistant RTO (checker)</option>
       </select>
       <label class="lab">Office <span class="req">*</span></label>
+      <input id="suOfficeSearch" class="field" placeholder="Search office… e.g. Panvel or 46" oninput="fillOffices(this.value)" autocomplete="off" style="margin-bottom:6px">
       <select id="suOffice" class="field"><option value="">Select your office…</option></select>
       <button class="btn" id="signupBtn" onclick="doSignup()"><span class="material-symbols-outlined">person_add</span>Sign up</button>
       <div id="signupMsg" class="msg"></div>
@@ -357,13 +358,18 @@ function validMobile(m){return /^[6-9]\d{9}$/.test(m);}
 var TCO={id:'TCO',name:'Transport Commissioner Office \u2014 All Maharashtra',color:'#0e5f54'};
 function rtoById(id){if(id===TCO.id)return TCO;return (LIVE_RTOS.find(r=>r.id===id))||DEFAULT_RTOS.find(r=>r.id===id);}
 var LIVE_RTOS=DEFAULT_RTOS.slice();
-function fillOffices(){
+function fillOffices(filterStr){
   var sel=document.getElementById('suOffice');if(!sel)return;
+  var box=document.getElementById('suOfficeSearch');
+  var fq=String(filterStr!=null?filterStr:(box?box.value:'')).toLowerCase().trim();
   var cur=sel.value;
   sel.innerHTML='<option value="">Select your office\u2026</option>';
-  var oT=document.createElement('option');oT.value=TCO.id;oT.textContent='\u2B50 '+TCO.name;sel.appendChild(oT);
-  LIVE_RTOS.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
-  if(cur)sel.value=cur;
+  function m(nm){return !fq||nm.toLowerCase().indexOf(fq)>=0;}
+  if(m(TCO.name)||fq==='all'){var oT=document.createElement('option');oT.value=TCO.id;oT.textContent='\u2B50 '+TCO.name;sel.appendChild(oT);}
+  var list=LIVE_RTOS.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).filter(function(r){return m(r.name);});
+  list.forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
+  if(cur){if(![].some.call(sel.options,function(o){return o.value===cur;})){var rr=rtoById(cur);if(rr){var ko=document.createElement('option');ko.value=rr.id;ko.textContent=rr.name;sel.appendChild(ko);}}sel.value=cur;}
+  if(fq&&list.length===1&&!cur)sel.value=list[0].id;
 }
 function refreshRtoList(){
   try{
