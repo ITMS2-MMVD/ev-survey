@@ -151,6 +151,10 @@ input,select,textarea{font-family:inherit;font-size:15px}
 .gpSplit3{display:flex;gap:14px;height:min(580px,68vh);margin:10px 0}
 .gpSplit3 .gpMapWrap2{flex:1.3;position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
 .gpSplit3 .gpSv{flex:1.1;height:100%;border:0;border-radius:10px;background:#000;display:block}
+.gpSvWrap{flex:1.1;height:100%;position:relative;border-radius:10px;overflow:hidden;background:#000}
+.gpSvWrap .gpSv{position:absolute;inset:0;width:100%;height:100%;flex:none}
+.svBtn{width:32px;height:32px;border-radius:8px;border:0;background:rgba(19,32,29,.75);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.svBtn:active{background:rgba(19,32,29,.95)}
 .gpCatsCol{flex:0 0 280px;display:flex;flex-direction:column;flex-wrap:nowrap;gap:9px;overflow:auto}
 .gpCatsCol .catbtn{width:100%;min-width:0;flex:0 0 auto;justify-content:flex-start}
 .gpFlash{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:500;color:#fff;padding:7px 16px;border-radius:999px;font-size:13px;font-weight:800;white-space:nowrap;pointer-events:none;box-shadow:0 3px 10px rgba(0,0,0,.35);animation:gpFlashA 2.2s linear infinite}
@@ -162,7 +166,7 @@ input,select,textarea{font-family:inherit;font-size:15px}
 .gpNavb:hover{background:#eceff3}
 .gpSkip{background:#fff3e0;border-color:#e0a23c;color:#a85f00}
 .gpSkip:hover{background:#ffe9c7}
-@media(max-width:760px){.gpSplit3{flex-direction:column;height:auto}.gpSplit3 .gpMapWrap2,.gpSplit3 .gpSv{height:min(240px,30vh)}.gpCatsCol{flex:0 0 auto}}
+@media(max-width:760px){.gpSplit3{flex-direction:column;height:auto}.gpSplit3 .gpMapWrap2,.gpSplit3 .gpSv,.gpSplit3 .gpSvWrap{height:min(240px,30vh)}.gpCatsCol{flex:0 0 auto}}
 </style>
 </head>
 <body>
@@ -559,6 +563,10 @@ function svExpand(){var b=document.getElementById('mpSvBox');if(b)b.classList.to
 function svOpen(){var b=document.getElementById('mpSvBox');if(!b)return;b.classList.add('huge');var mp=document.getElementById('mp');if(mp)mp.classList.add('svhuge');var bd=document.getElementById('svBackdrop');if(bd)bd.classList.add('on');}
 function svClose(){var b=document.getElementById('mpSvBox');if(b)b.classList.remove('huge');var mp=document.getElementById('mp');if(mp)mp.classList.remove('svhuge');var bd=document.getElementById('svBackdrop');if(bd)bd.classList.remove('on');}
 function svReload(){var f=document.getElementById('mpSv');if(f&&window._svUrl){f.src='about:blank';setTimeout(function(){f.src=window._svUrl;},40);}}
+function svKey(){try{return SV_KEY||localStorage.getItem('ev_sv_key')||'';}catch(e){return SV_KEY||'';}}
+function svUrlFor(lat,lon){var k=svKey();return k?('https://www.google.com/maps/embed/v1/streetview?key='+encodeURIComponent(k)+'&location='+lat+','+lon+'&heading=0&pitch=0&fov=90'):('https://maps.google.com/maps?q=&layer=c&cbll='+lat+','+lon+'&cbp=12,0,0,0,0&output=svembed');}
+function gpSvReload(){var f=document.getElementById('gpSv');if(f&&window._gpSvUrl){f.src='about:blank';setTimeout(function(){f.src=window._gpSvUrl;},80);}}
+function gpSvMaps(){if(window._gpSvLL)window.open('https://www.google.com/maps?layer=c&cbll='+window._gpSvLL,'_blank');}
 function escAttr(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
 function locDialog(mode){
   var s=(mode==='edit')?state.sites.find(function(x){return x.id===window._mpId;}):null;
@@ -578,7 +586,9 @@ function locDialog(mode){
     +'<label class="ldlab">Name</label><input id="ldName" class="ldin" value="'+escAttr(nm)+'" placeholder="e.g. NH-65 flyover">'
     +'<div class="gpSplit3">'
       +'<div class="gpMapWrap2"><div id="gpMap" class="gpMap"></div><div class="gpFlash">Move the marker to adjust GPS location</div></div>'
-      +'<iframe id="gpSv" class="gpSv" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>'
+      +'<div class="gpSvWrap"><iframe id="gpSv" class="gpSv" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>'
+      +'<div style="position:absolute;top:6px;right:6px;display:flex;gap:6px;z-index:5"><button class="svBtn" onclick="gpSvReload()" title="Reload Street View"><span class="material-symbols-outlined" style="font-size:18px">refresh</span></button><button class="svBtn" onclick="gpSvMaps()" title="Open in Google Maps"><span class="material-symbols-outlined" style="font-size:18px">open_in_new</span></button></div>'
+      +'<div style="position:absolute;left:6px;bottom:6px;background:rgba(19,32,29,.7);color:#fff;font:600 10px/1.2 sans-serif;padding:3px 7px;border-radius:6px;pointer-events:none;z-index:5">Black screen? Tap \u21bb to retry or \u2197 for Google Maps</div></div>'
       +col
     +'</div>'
     +'<div class="gpCoords">Selected: <b id="gpLatT">&mdash;</b>, <b id="gpLonT">&mdash;</b> &nbsp;<span style="color:#9aa6b6">&middot; paste:</span> <input id="ldLatLon" class="ldin" style="display:inline-block;width:190px;padding:5px 8px" placeholder="18.5123, 73.8567" onchange="gpManual()"></div>'
@@ -605,7 +615,7 @@ function pickAt(lat,lon,skipSave){
   document.getElementById('gpLatT').textContent=(+lat).toFixed(6);
   document.getElementById('gpLonT').textContent=(+lon).toFixed(6);
   document.getElementById('ldLatLon').value=(+lat).toFixed(6)+', '+(+lon).toFixed(6);
-  document.getElementById('gpSv').src='https://maps.google.com/maps?q=&layer=c&cbll='+lat+','+lon+'&cbp=12,0,0,0,0&output=svembed';
+  window._gpSvLL=lat+','+lon;window._gpSvUrl=svUrlFor(lat,lon);document.getElementById('gpSv').src=window._gpSvUrl;
   if(!skipSave&&window._gpMode==='edit'&&window._mpId&&db){var s=state.sites.find(function(x){return x.id===window._mpId;});if(s){s.lat=+lat;s.lon=+lon;db.collection('sites').doc(s.id).update({lat:+lat,lon:+lon}).then(function(){if(window._gpToastT)clearTimeout(window._gpToastT);window._gpToastT=setTimeout(function(){toast('<span class="material-symbols-outlined">my_location</span> GPS auto-saved.');},250);}).catch(function(){});}}
 }
 function gpManual(){var pr=document.getElementById('ldLatLon').value.trim().split(/[ ,]+/).filter(Boolean);var la=parseFloat(pr[0]),lo=parseFloat(pr[1]);if(isFinite(la)&&isFinite(lo)){pickAt(la,lo);if(window._gpMap)window._gpMap.setView([la,lo],17);}}
