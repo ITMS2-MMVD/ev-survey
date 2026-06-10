@@ -109,7 +109,23 @@
   .typetab{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 18px;border:1px solid var(--outline);border-radius:var(--r-sm);background:transparent;cursor:pointer;font-family:'Sora';font-weight:500;font-size:14px;color:var(--on-surface-variant);transition:.15s}
   .typetab.on{background:var(--secondary-container);border-color:transparent;color:var(--on-secondary-container)}
   .typetab.on::before{content:"check";font-family:'Material Symbols Outlined';font-size:18px}
-  .qcard{background:var(--sc-lowest);border:1px solid var(--outline-variant);border-radius:var(--r-md);padding:14px 16px;margin-bottom:12px}
+  .qcard{background:var(--sc-lowest);border:1px solid var(--outline-variant);border-radius:var(--r-md);padding:12px 14px 12px 10px;margin-bottom:10px;transition:box-shadow .15s,border-color .15s;position:relative}
+  .qcard:hover{border-color:#cdb27a;box-shadow:0 2px 10px rgba(224,140,0,.10)}
+  .qcard .qnum{position:absolute;left:-1px;top:-1px;background:var(--secondary-container);color:var(--on-secondary-container);font:700 10px/1 'Sora';padding:4px 7px;border-radius:var(--r-md) 0 var(--r-md) 0}
+  .qcard .qlabel{flex:1;border:0;border-bottom:1.5px dashed transparent;background:transparent;font:600 14px 'Sora';padding:6px 2px;min-width:120px}
+  .qcard .qlabel:hover,.qcard .qlabel:focus{border-bottom-color:#e08c00;outline:none}
+  .qcard .qtype{border:1px solid var(--outline-variant);border-radius:8px;height:32px;font:500 12px 'Sora';padding:0 6px;background:#fff}
+  .qcard .qreq{display:inline-flex;align-items:center;gap:4px;font:600 11px 'Sora';color:var(--on-surface-variant);background:#f4f6f9;border-radius:99px;padding:4px 10px;cursor:pointer;user-select:none}
+  .qcard .qreq:has(input:checked){background:#fdecec;color:#c53030}
+  .qcard .qdel{border:0;background:none;color:#9aa4b2;cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+  .qcard .qdel:hover{background:#fdecec;color:#c53030}
+  .qcard .qmove button{border:0;background:none;color:#9aa4b2;cursor:pointer;height:16px;display:block;line-height:1}
+  .qcard .qmove button:hover{color:#e08c00}
+  .qextra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--outline-variant)}
+  .qextra input{border:1px solid var(--outline-variant);border-radius:8px;height:32px;padding:0 9px;font:500 12px 'Sora';flex:1;min-width:140px;background:#fff}
+  .pubFormBtn{display:inline-flex;align-items:center;gap:8px;background:#0e5f54;color:#fff;border:0;border-radius:12px;height:42px;padding:0 18px;font:700 14px 'Sora';cursor:pointer;box-shadow:0 2px 8px rgba(14,95,84,.3)}
+  .pubFormBtn:hover{background:#0a4a41}
+  .pubFormBtn:disabled{opacity:.6;cursor:default}
   .qrow{display:flex;align-items:center;gap:10px}
   .qmove{display:flex;flex-direction:column;gap:3px}
   .qmove button{border:none;background:var(--sc-high);border-radius:var(--r-xs);width:28px;height:20px;cursor:pointer;color:var(--on-surface-variant);display:inline-flex;align-items:center;justify-content:center}
@@ -385,7 +401,9 @@
           <div class="left" id="qcount"></div>
           <button class="btn ghost sm" id="loadPremade"><span class="material-symbols-outlined">refresh</span>Load premade form</button>
           <button class="btn sm" id="addQ"><span class="material-symbols-outlined">add</span>Add question</button>
+          <button class="pubFormBtn" id="pubFormNow"><span class="material-symbols-outlined">publish</span>Publish form to inspectors</button>
         </div>
+        <div id="pubFormStat" class="hint" style="margin:-8px 0 14px"></div>
         <div id="qlist"></div>
       </div>
       <div class="preview">
@@ -761,6 +779,7 @@ function renderForm(){
     const needsOpts=['select','radio','multi'].includes(q.type);
     const isNum=q.type==='number';
     return '<div class="qcard" data-idx="'+i+'">'+
+      '<div class="qnum">Q'+(i+1)+'</div>'+
       '<div class="qrow">'+
         '<div class="qmove"><button data-act="up"><span class="material-symbols-outlined">keyboard_arrow_up</span></button><button data-act="down"><span class="material-symbols-outlined">keyboard_arrow_down</span></button></div>'+
         '<input class="qlabel" data-field="label" value="'+esc(q.label)+'">'+
@@ -806,6 +825,26 @@ function attachForm(){
 document.getElementById('addQ').addEventListener('click',()=>{state.forms[curType].push(Q('New question','text'));save();renderForm();});
 document.getElementById('loadPremade').addEventListener('click',()=>{if(confirm('Replace the current '+curType+' form with the premade version?')){state.forms[curType]=PREMADE[curType]();save();renderForm();}});
 document.querySelectorAll('.typetab').forEach(t=>t.addEventListener('click',()=>{document.querySelectorAll('.typetab').forEach(x=>x.classList.remove('on'));t.classList.add('on');curType=t.dataset.ftype;renderForm();}));
+async function publishFormsNow(btn,statEl){
+  if(typeof ensureForms==='function')ensureForms();
+  var st=statEl?document.getElementById(statEl):null;
+  if(btn)btn.disabled=true;
+  if(st){st.textContent='Publishing\u2026';st.style.color='';}
+  var _fn=Date.now(),_fok=false;
+  try{await _fsWrite('config/forms',{formsJson:{stringValue:JSON.stringify(state.forms)},updatedAt:{integerValue:String(_fn)}});_fok=true;}
+  catch(e1){try{if((typeof db!=='undefined'&&db)||connect(true)){await db.collection('config').doc('forms').set({forms:state.forms,formsJson:JSON.stringify(state.forms),updatedAt:_fn});_fok=true;}}catch(e2){}}
+  if(btn)btn.disabled=false;
+  if(_fok){
+    if(st){st.innerHTML='\u2713 Published at '+new Date().toLocaleTimeString()+' \u2014 inspectors\u2019 Part 2 forms for all three categories are updated (live on open forms).';st.style.color='#1a7f37';}
+    flash('<span class="material-symbols-outlined">cloud_done</span> Form published \u2014 live in Part 2 now.');syncStat('forms PUBLISHED '+new Date().toLocaleTimeString());
+  } else {
+    if(st){st.textContent='\u2715 Publish failed (quota/network) \u2014 try again later.';st.style.color='#c53030';}
+    flash('<span class="material-symbols-outlined">error</span> Form publish failed \u2014 try again later.',8000);syncStat('forms PUBLISH FAILED',true);
+  }
+  return _fok;
+}
+var _pfn=document.getElementById('pubFormNow');
+if(_pfn)_pfn.addEventListener('click',function(){publishFormsNow(_pfn,'pubFormStat');});
 function renderPreview(){
   ensureForms();
   var PVC={flyover:{c:'#e08c00',i:'route',t:'Flyover'},rto:{c:'#2f6bd6',i:'account_balance',t:'RTO premises'},msrtc:{c:'#1f8a52',i:'directions_bus',t:'MSRTC depot'}};
@@ -1140,7 +1179,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v7 \u00b7 forms+exports';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v8 \u00b7 form builder';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
