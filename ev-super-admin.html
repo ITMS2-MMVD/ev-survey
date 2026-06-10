@@ -721,8 +721,9 @@ document.getElementById('locateBtn').addEventListener('click',()=>{
 /* ---------- jurisdiction UI ---------- */
 function renderRtos(){
   const el=document.getElementById('rtoList');
-  el.innerHTML=state.rtos.length?state.rtos.map(r=>'<div class="rto-item"><input type="color" class="swatch swPick" value="'+(/^#[0-9a-fA-F]{6}$/.test(r.color||'')?r.color:'#888888')+'" data-id="'+r.id+'" title="Click to change office colour"><span class="nm">'+r.name+'</span><button class="x" data-id="'+r.id+'"><span class="material-symbols-outlined">close</span></button></div>').join(''):'<div class="hint">No RTO offices yet. Add one above.</div>';
+  el.innerHTML=state.rtos.length?state.rtos.map(r=>'<div class="rto-item"><input type="color" class="swatch swPick" value="'+(/^#[0-9a-fA-F]{6}$/.test(r.color||'')?r.color:'#888888')+'" data-id="'+r.id+'" title="Click to change office colour"><span class="nm">'+r.name+'</span><button class="ed" data-id="'+r.id+'" title="Rename office" style="border:0;background:none;cursor:pointer;color:#0e5f54;display:flex;align-items:center"><span class="material-symbols-outlined" style="font-size:18px">edit</span></button><button class="x" data-id="'+r.id+'"><span class="material-symbols-outlined">close</span></button></div>').join(''):'<div class="hint">No RTO offices yet. Add one above.</div>';
   el.querySelectorAll('.x').forEach(b=>b.onclick=()=>{const id=b.dataset.id;state.rtos=state.rtos.filter(r=>r.id!==id);Object.keys(state.assign).forEach(k=>{if(state.assign[k]===id)delete state.assign[k];});save();renderRtos();renderTalukas();renderAssign();renderLegend();retagSites();renderOffices();});
+  el.querySelectorAll('.ed').forEach(b=>b.onclick=()=>{const id=b.dataset.id;const r=state.rtos.find(x=>x.id===id);if(!r)return;const nv=prompt('Rename office:',r.name);if(nv&&nv.trim()){r.name=nv.trim();save();renderRtos();renderLegend();renderAssign();renderOffices();try{renderTalukas();}catch(e){}}});
   el.querySelectorAll('.swPick').forEach(inp=>inp.onchange=()=>{const r=state.rtos.find(x=>x.id===inp.dataset.id);if(r){r.color=inp.value;save();renderRtos();renderTalukas();renderLegend();renderOffices();}});
 }
 document.getElementById('addRto').addEventListener('click',()=>{
@@ -1112,7 +1113,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v3 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v5 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1500,6 +1501,17 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
     $('monBody').innerHTML='<div class="respEmpty">Loading\u2026</div>';
     try{
+      try{
+        var cfgD=await db.collection('config').doc('adminState').get();
+        if(cfgD&&cfgD.exists){var cs=null;try{cs=JSON.parse(cfgD.data().state||'{}');}catch(e){cs=null;}
+          if(cs&&cs.rtos&&cs.rtos.length){
+            var byId={};(state.rtos||[]).forEach(function(r){byId[r.id]=r;});
+            cs.rtos.forEach(function(r){if(r&&r.id)byId[r.id]=r;});
+            state.rtos=Object.keys(byId).map(function(k){return byId[k];});
+            try{save();}catch(e){}
+          }
+        }
+      }catch(e){}
       var snap=await db.collection('sites').get();
       var by={};
       snap.forEach(function(d){var s=d.data();var id=s.rto||'(unassigned)';if(!by[id])by[id]={total:0,reviewed:0,checked:0,potential:0,river:0,rail:0,local:0,surveyed:0};var b=by[id];b.total++;if(s.category){b.reviewed++;if(b[s.category]!==undefined)b[s.category]++;}if(s.checkStatus==='approved')b.checked++;if(s.category==='potential'&&s.status==='surveyed')b.surveyed++;});

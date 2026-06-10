@@ -1106,7 +1106,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v12 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v13 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1463,6 +1463,17 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
     if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
     $('monBody').innerHTML='<div class="respEmpty">Loading\u2026</div>';
     try{
+      try{
+        var cfgD=await db.collection('config').doc('adminState').get();
+        if(cfgD&&cfgD.exists){var cs=null;try{cs=JSON.parse(cfgD.data().state||'{}');}catch(e){cs=null;}
+          if(cs&&cs.rtos&&cs.rtos.length){
+            var byId={};(state.rtos||[]).forEach(function(r){byId[r.id]=r;});
+            cs.rtos.forEach(function(r){if(r&&r.id)byId[r.id]=r;});
+            state.rtos=Object.keys(byId).map(function(k){return byId[k];});
+            try{save();}catch(e){}
+          }
+        }
+      }catch(e){}
       var snap=await db.collection('sites').get();
       var by={};
       snap.forEach(function(d){var s=d.data();var id=s.rto||'(unassigned)';if(!by[id])by[id]={total:0,reviewed:0,checked:0,potential:0,river:0,rail:0,local:0,surveyed:0};var b=by[id];b.total++;if(s.category){b.reviewed++;if(b[s.category]!==undefined)b[s.category]++;}if(s.checkStatus==='approved')b.checked++;if(s.category==='potential'&&s.status==='surveyed')b.surveyed++;});

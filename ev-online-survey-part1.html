@@ -354,12 +354,14 @@ let db=null,cfgOk=false;
 function toast(m,ms){const t=document.getElementById('toast');t.innerHTML=m;t.classList.add('show');clearTimeout(t._t);if(ms!==0)t._t=setTimeout(()=>t.classList.remove('show'),ms||2400);}
 function norm(m){return String(m||'').replace(/\D/g,'').slice(-10);}
 function validMobile(m){return /^[6-9]\d{9}$/.test(m);}
-function rtoById(id){return (LIVE_RTOS.find(r=>r.id===id))||DEFAULT_RTOS.find(r=>r.id===id);}
+var TCO={id:'TCO',name:'Transport Commissioner Office \u2014 All Maharashtra',color:'#0e5f54'};
+function rtoById(id){if(id===TCO.id)return TCO;return (LIVE_RTOS.find(r=>r.id===id))||DEFAULT_RTOS.find(r=>r.id===id);}
 var LIVE_RTOS=DEFAULT_RTOS.slice();
 function fillOffices(){
   var sel=document.getElementById('suOffice');if(!sel)return;
   var cur=sel.value;
   sel.innerHTML='<option value="">Select your office\u2026</option>';
+  var oT=document.createElement('option');oT.value=TCO.id;oT.textContent='\u2B50 '+TCO.name;sel.appendChild(oT);
   LIVE_RTOS.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(r){var o=document.createElement('option');o.value=r.id;o.textContent=r.name;sel.appendChild(o);});
   if(cur)sel.value=cur;
 }
@@ -476,7 +478,7 @@ function initMap(){
 
 async function loadSites(){
   if(!db)return;
-  try{const q=await db.collection('sites').where('rto','==',state.profile.office).get();state.sites=q.docs.map(d=>Object.assign({id:d.id},d.data()));if(onlyPotentialView())state.sites=state.sites.filter(function(s){return s.category==='potential';});}
+  try{const q=await (state.profile.office===TCO.id?db.collection('sites').get():db.collection('sites').where('rto','==',state.profile.office).get());state.sites=q.docs.map(d=>Object.assign({id:d.id},d.data()));if(onlyPotentialView())state.sites=state.sites.filter(function(s){return s.category==='potential';});}
   catch(e){toast('<span class="material-symbols-outlined">error</span> Could not load: '+(e.message||e),4000);state.sites=[];}
   renderAll();
 }
@@ -750,7 +752,7 @@ async function renderUsers(){
   if(!db){wrap.innerHTML='<div class="empty">Not connected.</div>';return;}
   wrap.innerHTML='<div class="empty">Loading\u2026</div>';
   try{
-    var q=await db.collection('inspectors').where('office','==',state.profile.office).get();
+    var q=await (state.profile.office===TCO.id?db.collection('inspectors').get():db.collection('inspectors').where('office','==',state.profile.office).get());
     var us=[];q.forEach(function(d){us.push(Object.assign({mobile:d.id},d.data()));});
     var makers=us.filter(function(u){return u.designation==='IMV'||u.designation==='AIMV';});
     makers.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
