@@ -417,6 +417,7 @@
         <button class="btn ghost sm" id="monRefresh" style="width:auto"><span class="material-symbols-outlined">refresh</span>Refresh</button>
         <button class="btn ghost sm" id="monExport" style="width:auto"><span class="material-symbols-outlined">download</span>Excel</button>
         <button class="btn ghost sm" id="dlPart1" style="width:auto"><span class="material-symbols-outlined">table_view</span>Part 1 details</button>
+        <button class="btn ghost sm" id="dlP1Resp" style="width:auto;border-color:#0e5f54;color:#0e5f54"><span class="material-symbols-outlined">fact_check</span>Part 1 responses (who marked what)</button>
         <button class="btn ghost sm" id="dlPart2" style="width:auto"><span class="material-symbols-outlined">table_view</span>Part 2 details</button>
         <button class="btn ghost sm" id="dlP2Fly" style="width:auto;border-color:#e08c00;color:#e08c00"><span class="material-symbols-outlined">route</span>Flyover responses</button>
         <button class="btn ghost sm" id="dlP2Rto" style="width:auto;border-color:#0969da;color:#0969da"><span class="material-symbols-outlined">account_balance</span>RTO office responses</button>
@@ -1583,6 +1584,32 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
   }
   $('monExport').addEventListener('click',monExport);
   $('dlPart1').addEventListener('click',exportPart1Detailed);
+  $('dlP1Resp').addEventListener('click',exportPart1Responses);
+  function exportPart1Responses(){
+    (async function(){
+      var ok=await _ensureSites();if(!ok)return;
+      var CAT1={potential:'Potential EV site',river:'River bridge',rail:'Rail bridge',local:'Local bridge',notsuitable:'Not suitable'};
+      var rows=(state.sites||[]).slice();
+      if(!rows.length){flash('<span class="material-symbols-outlined">info</span> No locations to export.');return;}
+      var head=['Sr','Location name','Type','RTO office','Taluka','Lat','Lon','Part 1 marking','Marked by','Marked on','Check status','Checked by','Checked on','Check remark'];
+      var aoa=[head],sr=0;
+      rows.sort(function(a,b){return String(rtoNm(a.rto)).localeCompare(String(rtoNm(b.rto)))||String(a.taluka||'').localeCompare(String(b.taluka||''))||String(a.name||'').localeCompare(String(b.name||''));});
+      rows.forEach(function(s){
+        sr++;
+        var chk=s.checkStatus==='approved'?'Approved':(s.checkStatus==='rejected'?'Sent back':(s.category?'Pending check':''));
+        aoa.push([sr,s.name||'',_ptLabel(s.type||s.formType),rtoNm(s.rto)||'',s.taluka||'',(s.lat!=null?+s.lat:''),(s.lon!=null?+s.lon:''),
+          (s.category?(CAT1[s.category]||s.category):'PENDING'),
+          (s.triagedByName||s.triagedBy||''),_fmtDate(s.triagedAt),
+          chk,(s.checkedByName||s.checkedBy||''),_fmtDate(s.checkedAt),(s.checkRemark||'')]);
+      });
+      var ws=XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols']=head.map(function(hh,i){var w=Math.max(String(hh).length+2,10);for(var ri=1;ri<aoa.length;ri++){var c=aoa[ri][i];if(c!=null)w=Math.max(w,Math.min(String(c).length+2,42));}return {wch:w};});
+      var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Part 1 responses');
+      XLSX.writeFile(wb,'ev-part1-responses.xlsx');
+      flash('<span class="material-symbols-outlined">download_done</span> Part 1 responses exported ('+sr+' rows) with marker & checker names.');
+    })();
+  }
+
   $('dlPart2').addEventListener('click',exportPart2Detailed);
   $('dlP2Fly').addEventListener('click',function(){exportPart2Type('flyover');});
   $('dlP2Rto').addEventListener('click',function(){exportPart2Type('rto');});
