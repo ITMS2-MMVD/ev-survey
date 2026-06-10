@@ -91,6 +91,8 @@ input,select,textarea{font-family:inherit;font-size:15px}
 
 .photogrid{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
 .thumb{position:relative;width:74px;height:74px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#eef2f7}
+.phitem{display:flex;flex-direction:column;align-items:center;width:78px}
+.pcap{font:600 9px/1.25 'Sora',sans-serif;color:#3b4656;text-align:center;margin-top:3px;word-break:break-word}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb .rm{position:absolute;top:2px;right:2px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .thumb .gtag{position:absolute;left:2px;bottom:2px;background:rgba(31,138,82,.92);color:#fff;border-radius:6px;padding:1px 4px;font-size:9px;display:flex;align-items:center;gap:2px}
@@ -249,7 +251,7 @@ input,select,textarea{font-family:inherit;font-size:15px}
         <div id="photoGrid" class="photogrid"></div>
         <button class="btn sec" id="photoBtn" onclick="openCamera()"><span class="material-symbols-outlined">photo_camera</span>Take photo</button>
         <input id="photoInput" type="file" accept="image/*" capture="environment" style="display:none">
-        <div class="hint" style="margin-top:6px">Opens the camera directly. Your GPS location is captured automatically with each photo. Up to 5 photos.</div>
+        <div class="hint" style="margin-top:6px">Opens the camera directly — gallery upload is not allowed. GPS is captured with each photo and must be within 1 km of the survey point. Up to 5 photos.</div>
 
         <button class="btn" id="submitBtn" onclick="submitSurvey()"><span class="material-symbols-outlined">check_circle</span>Submit survey</button>
         <div id="formMsg" class="msg"></div>
@@ -453,7 +455,22 @@ async function enterApp(prof){
   showView('pending');
   loadSites();
 }
-async function loadForms(){if(!db)return;try{const snap=await db.collection('config').doc('forms').get();if(snap.exists&&snap.data()&&snap.data().forms)FORMSDEF=snap.data().forms;}catch(e){}}
+function normForms(raw){
+  if(!raw)return null;var out={},any=false;
+  ['flyover','rto','msrtc'].forEach(function(t){
+    var arr=raw[t];if(!arr||!arr.length)return;
+    out[t]=arr.filter(function(f){return f&&(f.type||f.t)!=='gps_photo';}).map(function(f){
+      if(f.k&&f.t&&!f.type)return f;
+      var ty=f.type||f.t||'text';var o=(f.options||f.o||[]).slice();
+      if(ty==='toggle'){ty='select';o=['Yes','No'];}
+      if(ty==='radio')ty='select';
+      if(ty!=='select'&&ty!=='number')ty='text';
+      return {k:String(f.id||f.k||('q'+Math.random().toString(36).slice(2,7))),l:String(f.label||f.l||''),t:ty,o:o,ph:String(f.help||f.ph||'')};
+    });any=true;
+  });
+  return any?out:null;
+}
+async function loadForms(){if(!db)return;try{const snap=await db.collection('config').doc('forms').get();if(snap.exists&&snap.data()){var d=snap.data();var raw=null;if(d.formsJson){try{raw=JSON.parse(d.formsJson);}catch(e){}}if(!raw)raw=d.forms;var n=normForms(raw);if(n)FORMSDEF=n;}}catch(e){}}
 async function loadJurisdiction(){
   if(!db)return;
   try{
@@ -589,7 +606,7 @@ function setFormType(t){
   }
 }
 function showTypeChooser(){var tc=document.getElementById('typeChooser');var fb=document.getElementById('formBody');if(tc)tc.classList.remove('hidden');if(fb)fb.classList.add('hidden');state.formType=null;}
-function watchForms(){if(!db)return;try{db.collection('config').doc('forms').onSnapshot(function(snap){if(!(snap.exists&&snap.data()&&snap.data().forms))return;var nf=snap.data().forms;var t=state.formType;var changed=!FORMSDEF||(t&&JSON.stringify((FORMSDEF&&FORMSDEF[t])||null)!==JSON.stringify(nf[t]||null));FORMSDEF=nf;var fb=document.getElementById('formBody');if(changed&&t&&fb&&!fb.classList.contains('hidden'))buildDynFields(t);});}catch(e){}}
+function watchForms(){if(!db)return;try{db.collection('config').doc('forms').onSnapshot(function(snap){if(!(snap.exists&&snap.data()))return;var d=snap.data();var raw=null;if(d.formsJson){try{raw=JSON.parse(d.formsJson);}catch(e){}}if(!raw)raw=d.forms;var nf=normForms(raw);if(!nf)return;var t=state.formType;var changed=!FORMSDEF||(t&&JSON.stringify((FORMSDEF&&FORMSDEF[t])||null)!==JSON.stringify(nf[t]||null));FORMSDEF=nf;var fb=document.getElementById('formBody');if(changed&&t&&fb&&!fb.classList.contains('hidden'))buildDynFields(t);});}catch(e){}}
 function buildDynFields(t){
   const wrap=document.getElementById('dynFields');
   wrap.innerHTML=formFor(t).map(fld=>{
@@ -654,7 +671,7 @@ function compressImage(file){
 }
 function renderPhotos(){
   const g=document.getElementById('photoGrid');if(!g)return;const ph=state.photos||[];
-  g.innerHTML=ph.map((p,i)=>'<div class="thumb"><img src="'+p.dataUrl+'"><button class="rm" onclick="removePhoto('+i+')">\u2715</button>'+(p.lat!=null?'<span class="gtag"><span class="material-symbols-outlined" style="font-size:11px">place</span>GPS</span>':'<span class="gtag bad">no GPS</span>')+'</div>').join('');
+  g.innerHTML=ph.map((p,i)=>'<div class="phitem"><div class="thumb"><img src="'+p.dataUrl+'"><button class="rm" onclick="removePhoto('+i+')">\u2715</button>'+(p.lat!=null?'<span class="gtag"><span class="material-symbols-outlined" style="font-size:11px">place</span>GPS</span>':'<span class="gtag bad">no GPS</span>')+'</div><div class="pcap">'+(p.lat!=null?(p.lat.toFixed(5)+', '+p.lon.toFixed(5)+(p.acc?(' \u00b7 \u00b1'+p.acc+'m'):'')+(p.distM!=null?('<br>'+p.distM+' m from point'):'')):'no GPS')+'</div></div>').join('');
   const c=document.getElementById('photoCount');if(c)c.textContent='('+ph.length+'/5)';
   const b=document.getElementById('photoBtn');if(b)b.style.display=ph.length>=5?'none':'';
 }
@@ -665,8 +682,13 @@ function removePhoto(i){if(state.photos){state.photos.splice(i,1);renderPhotos()
   try{
     const dataUrl=await compressImage(file);
     let lat=null,lon=null,acc=null;
-    try{const p=await getPosition();lat=+p.coords.latitude.toFixed(6);lon=+p.coords.longitude.toFixed(6);acc=Math.round(p.coords.accuracy||0);}catch(ge){toast('<span class="material-symbols-outlined">location_off</span> Photo saved, but '+gpsErrMsg(ge),5000);}
-    state.photos=state.photos||[];state.photos.push({dataUrl:dataUrl,lat:lat,lon:lon,acc:acc,takenAt:Date.now()});
+    try{const p=await getPosition();lat=+p.coords.latitude.toFixed(6);lon=+p.coords.longitude.toFixed(6);acc=Math.round(p.coords.accuracy||0);}catch(ge){toast('<span class="material-symbols-outlined">location_off</span> Photo REJECTED \u2014 GPS is required for site photos. '+gpsErrMsg(ge),6000);btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">photo_camera</span>Take photo';return;}
+    var distM=null;
+    if(state.targetLat!=null&&state.targetLon!=null){
+      distM=Math.round(haversine({lat:lat,lon:lon},{lat:state.targetLat,lon:state.targetLon}));
+      if(distM>1000){toast('<span class="material-symbols-outlined">block</span> Photo REJECTED \u2014 taken '+(distM/1000).toFixed(2)+' km from the survey point. You must be within 1 km.',7000);btn.disabled=false;btn.innerHTML='<span class="material-symbols-outlined">photo_camera</span>Take photo';return;}
+    }
+    state.photos=state.photos||[];state.photos.push({dataUrl:dataUrl,lat:lat,lon:lon,acc:acc,distM:distM,takenAt:Date.now()});
     if(lat!=null&&!document.getElementById('fLat').value){document.getElementById('fLat').value=lat;document.getElementById('fLon').value=lon;updateTalukaHint();}
     renderPhotos();
   }catch(err){toast('Could not process photo: '+(err.message||err),4000);}

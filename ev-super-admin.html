@@ -418,6 +418,9 @@
         <button class="btn ghost sm" id="monExport" style="width:auto"><span class="material-symbols-outlined">download</span>Excel</button>
         <button class="btn ghost sm" id="dlPart1" style="width:auto"><span class="material-symbols-outlined">table_view</span>Part 1 details</button>
         <button class="btn ghost sm" id="dlPart2" style="width:auto"><span class="material-symbols-outlined">table_view</span>Part 2 details</button>
+        <button class="btn ghost sm" id="dlP2Fly" style="width:auto;border-color:#e08c00;color:#e08c00"><span class="material-symbols-outlined">route</span>Flyover responses</button>
+        <button class="btn ghost sm" id="dlP2Rto" style="width:auto;border-color:#0969da;color:#0969da"><span class="material-symbols-outlined">account_balance</span>RTO office responses</button>
+        <button class="btn ghost sm" id="dlP2Mst" style="width:auto;border-color:#1a7f37;color:#1a7f37"><span class="material-symbols-outlined">directions_bus</span>MSRTC responses</button>
       </div>
       <div class="respTabs"><button class="rt on" id="mt1">Part 1 &mdash; Triage</button><button class="rt" id="mt2">Part 2 &mdash; Field survey</button></div>
       <div id="monBody"><div class="respEmpty">Click Refresh to load progress.</div></div>
@@ -1115,7 +1118,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v6 \u00b7 map+points';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v7 \u00b7 forms+exports';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1301,10 +1304,13 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
 
   var _pf=document.getElementById('fbPublishForms');
   if(_pf)_pf.addEventListener('click',async function(){
-    if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
+    if(!db)connect(true);
     if(typeof ensureForms==='function')ensureForms();
-    try{await db.collection('config').doc('forms').set({forms:state.forms,updatedAt:Date.now()});flash('<span class="material-symbols-outlined">cloud_done</span> Survey forms published \u2014 field officers load them on next open.');}
-    catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);}
+    var _fn=Date.now(),_fok=false;
+    try{await _fsWrite('config/forms',{formsJson:{stringValue:JSON.stringify(state.forms)},updatedAt:{integerValue:String(_fn)}});_fok=true;}
+    catch(e1){try{if((typeof db!=='undefined'&&db)||connect(true)){await db.collection('config').doc('forms').set({forms:state.forms,formsJson:JSON.stringify(state.forms),updatedAt:_fn});_fok=true;}}catch(e2){}}
+    if(_fok){flash('<span class="material-symbols-outlined">cloud_done</span> Survey forms published \u2014 IMV/AIMV see the updated form immediately (live) or on next open.');syncStat('forms PUBLISHED '+new Date().toLocaleTimeString());}
+    else{flash('<span class="material-symbols-outlined">error</span> Forms could NOT be published \u2014 try again later (quota/network).',8000);syncStat('forms PUBLISH FAILED',true);}
   });
 
   async function pullAllSites(silent){
@@ -1618,6 +1624,39 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
   $('monExport').addEventListener('click',monExport);
   $('dlPart1').addEventListener('click',exportPart1Detailed);
   $('dlPart2').addEventListener('click',exportPart2Detailed);
+  $('dlP2Fly').addEventListener('click',function(){exportPart2Type('flyover');});
+  $('dlP2Rto').addEventListener('click',function(){exportPart2Type('rto');});
+  $('dlP2Mst').addEventListener('click',function(){exportPart2Type('msrtc');});
+  function _fmtDate(ms){if(!ms)return '';try{return new Date(ms).toLocaleString('en-IN');}catch(e){return String(ms);}}
+  async function exportPart2Type(t){
+    if(typeof ensureForms==='function')ensureForms();
+    var ok=await _ensureSites();if(!ok)return;
+    var lbl={flyover:'Flyover',rto:'RTO office',msrtc:'MSRTC depot'}[t]||t;
+    var rows=(state.sites||[]).filter(function(s){return ((s.type||s.formType)===t)&&(s.category==='potential'||s.status==='surveyed');});
+    if(!rows.length){flash('<span class="material-symbols-outlined">info</span> No '+lbl+' locations to export.');return;}
+    var fdef=((state.forms&&state.forms[t])||[]).filter(function(f){return f&&f.type!=='gps_photo';});
+    var head=['Sr','Location name','RTO office','Taluka','Survey status','Surveyed by','Surveyed on','Site lat','Site lon','Officer distance from point (m)'];
+    fdef.forEach(function(f){head.push(f.label||String(f.id));});
+    head.push('Remark','Photos taken');
+    for(var pi=1;pi<=5;pi++)head.push('Photo '+pi+' GPS (lat, lon \u00b1acc / dist m)');
+    var aoa=[head];var sr=0;
+    rows.sort(function(a,b){return String(rtoNm(a.rto)).localeCompare(String(rtoNm(b.rto)))||String(a.taluka||'').localeCompare(String(b.taluka||''))||String(a.name||'').localeCompare(String(b.name||''));});
+    rows.forEach(function(s){
+      sr++;var d=s.data||{};
+      var r=[sr,s.name||'',rtoNm(s.rto)||'',s.taluka||'',(s.status==='surveyed'?'Surveyed':'PENDING'),(s.surveyedByName||s.surveyedBy||''),_fmtDate(s.surveyedAt),(s.lat!=null?+s.lat:''),(s.lon!=null?+s.lon:''),(s.verifiedDistM!=null?s.verifiedDistM:'')];
+      fdef.forEach(function(f){var v=d[String(f.id)];if(v==null&&f.k!=null)v=d[String(f.k)];r.push(v==null?'':v);});
+      r.push(s.remark||'');
+      var ph=s.photos||[];r.push(ph.length);
+      for(var pi=0;pi<5;pi++){var p=ph[pi];r.push(p?((p.lat!=null?(p.lat+', '+p.lon+(p.acc?(' \u00b1'+p.acc+'m'):'')):'no GPS')+(p.distM!=null?(' / '+p.distM+' m'):'')):'');}
+      aoa.push(r);
+    });
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols']=head.map(function(hh,i){var w=Math.max(String(hh).length+2,10);for(var ri=1;ri<aoa.length;ri++){var c=aoa[ri][i];if(c!=null)w=Math.max(w,Math.min(String(c).length+2,46));}return {wch:w};});
+    var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,lbl.slice(0,28));
+    XLSX.writeFile(wb,'ev-part2-'+t+'-responses.xlsx');
+    flash('<span class="material-symbols-outlined">download_done</span> '+lbl+' responses exported ('+sr+' rows). Columns follow the current published form.');
+  }
+
   $('mt1').addEventListener('click',function(){showMon('1');});
   $('mt2').addEventListener('click',function(){showMon('2');});
 

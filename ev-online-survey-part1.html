@@ -792,7 +792,22 @@ var DEFAULT_FORMS={
   rto:[{k:'parking',l:'Spare parking bays for chargers',t:'number',ph:'approx count'},{k:'power',l:'Power / transformer on premises',t:'select',o:['Yes','No','Unsure']},{k:'access',l:'Public accessibility',t:'select',o:['Good','Moderate','Poor']}],
   msrtc:[{k:'bays',l:'Possible charging bays',t:'number',ph:'approx count'},{k:'power',l:'Depot power availability',t:'select',o:['Yes','No','Unsure']},{k:'busparking',l:'Bus parking capacity',t:'number',ph:'approx count'}]
 };
-async function loadForms(){if(!db)return;try{var snap=await db.collection('config').doc('forms').get();if(snap.exists&&snap.data()&&snap.data().forms)state.formsDef=snap.data().forms;}catch(e){}}
+function normForms(raw){
+  if(!raw)return null;var out={},any=false;
+  ['flyover','rto','msrtc'].forEach(function(t){
+    var arr=raw[t];if(!arr||!arr.length)return;
+    out[t]=arr.filter(function(f){return f&&(f.type||f.t)!=='gps_photo';}).map(function(f){
+      if(f.k&&f.t&&!f.type)return f;
+      var ty=f.type||f.t||'text';var o=(f.options||f.o||[]).slice();
+      if(ty==='toggle'){ty='select';o=['Yes','No'];}
+      if(ty==='radio')ty='select';
+      if(ty!=='select'&&ty!=='number')ty='text';
+      return {k:String(f.id||f.k||('q'+Math.random().toString(36).slice(2,7))),l:String(f.label||f.l||''),t:ty,o:o,ph:String(f.help||f.ph||'')};
+    });any=true;
+  });
+  return any?out:null;
+}
+async function loadForms(){if(!db)return;try{var snap=await db.collection('config').doc('forms').get();if(snap.exists&&snap.data()){var d=snap.data();var raw=null;if(d.formsJson){try{raw=JSON.parse(d.formsJson);}catch(e){}}if(!raw)raw=d.forms;var n=normForms(raw);if(n)state.formsDef=n;}}catch(e){}}
 function svFields(type){return (state.formsDef&&state.formsDef[type])||DEFAULT_FORMS[type]||DEFAULT_FORMS.flyover;}
 function openSurveyForm(id){
   window._mpId=id;var s=state.sites.find(function(x){return x.id===id;});if(!s){toast('Open a location first.');return;}
