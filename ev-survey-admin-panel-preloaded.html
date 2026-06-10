@@ -457,7 +457,7 @@ const DEFAULT_ASSIGN={"Ahmadnagar": "MH16", "Akola (Ahmednagar)": "MH16", "Karja
 let state={ rtos:[], assign:{}, forms:{}, settings:{radius:200}, sites:[] };
 state._talukas=null;
 function persistable(){return {rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings,sites:state.sites};}
-var _suppressCloudSave=false,_cfgSaveT=null,_bootDone=false;
+var _suppressCloudSave=false,_cfgSaveT=null,_bootDone=false,_cloudLoaded=false;
 function save(){try{localStorage.setItem(LS,JSON.stringify(persistable()));}catch(e){} try{if(!_suppressCloudSave)cloudSaveConfig();}catch(e){}}
 function syncStat(text,err){
   try{
@@ -469,6 +469,7 @@ function syncStat(text,err){
 }
 function cloudSaveConfig(){
   if(typeof db==='undefined'||!db||!_bootDone)return;
+  if(!_cloudLoaded)return; /* never overwrite cloud with stale local state */
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
     try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(err){syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true);});}catch(e){}
@@ -477,11 +478,12 @@ function cloudSaveConfig(){
 function _withTimeout(pr,ms,label){return Promise.race([pr,new Promise(function(_,rej){setTimeout(function(){rej(new Error((label||'request')+' timed out (network blocking Firestore)'));},ms);})]);}
 var FS_PROJ='ev-survey-mh';
 function _fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+FS_PROJ+'/databases/(default)/documents/';}
-function _fsRead(docPath){return fetch(_fsBase()+docPath,{method:'GET'}).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
+function _fsRead(docPath){return fetch(_fsBase()+docPath,{method:'GET'}).then(function(r){if(r.status===404)return null;if(r.status===429)throw new Error('Daily free Firebase quota used up (HTTP 429). It resets ~12:30 PM IST. Data is safe \u2014 try again after reset.');if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
 async function cloudLoadConfig(){
   try{
     syncStat('reading map\u2026');
     var j=await _withTimeout(_fsRead('config/adminState'),12000,'map read');
+    _cloudLoaded=true;
     if(!j){syncStat('no map saved in cloud yet \u2014 publish from the device that has it',true);return false;}
     var raw=(j.fields&&j.fields.state&&j.fields.state.stringValue)||'';
     var o=null;try{o=JSON.parse(raw||'{}');}catch(e){o=null;}
@@ -1314,7 +1316,7 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
       try{if(siteLayer&&siteLayer.getBounds&&(add+upd)>0){var bb=siteLayer.getBounds();if(bb&&bb.isValid())map.fitBounds(bb,{maxZoom:9,padding:[28,28]});}}catch(e){}
       flash('<span class="material-symbols-outlined">cloud_done</span> Cloud has '+snap.size+' locations \u2014 loaded '+(add+upd)+' onto the map'+(bad?(' ('+bad+' had no coordinates)'):'')+'.',9000);
       return add+upd;
-    }catch(e){flash('<span class="material-symbols-outlined">error</span> Load failed: '+(e.message||e),9000);return 0;}
+    }catch(e){var m=(e&&e.message)||String(e);if(/resource.?exhausted|429/i.test(m))m='Daily free Firebase quota used up (HTTP 429). It resets ~12:30 PM IST. Data is safe \u2014 try again after reset.';flash('<span class="material-symbols-outlined">error</span> Load failed: '+m,9000);return 0;}
   }
   var _pullAllBtn=document.getElementById('fbPullAll');
   if(_pullAllBtn)_pullAllBtn.addEventListener('click',function(){pullAllSites(false);});

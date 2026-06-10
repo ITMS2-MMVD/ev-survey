@@ -457,7 +457,7 @@ const DEFAULT_ASSIGN={"Ahmadnagar": "MH16", "Akola (Ahmednagar)": "MH16", "Karja
 let state={ rtos:[], assign:{}, forms:{}, settings:{radius:200}, sites:[] };
 state._talukas=null;
 function persistable(){return {rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings,sites:state.sites};}
-var _suppressCloudSave=false,_cfgSaveT=null,_bootDone=false;
+var _suppressCloudSave=false,_cfgSaveT=null,_bootDone=false,_cloudLoaded=false;
 function save(){try{localStorage.setItem(LS,JSON.stringify(persistable()));}catch(e){} try{if(!_suppressCloudSave)cloudSaveConfig();}catch(e){}}
 function syncStat(text,err){
   try{
@@ -469,6 +469,7 @@ function syncStat(text,err){
 }
 function cloudSaveConfig(){
   if(!_bootDone)return;
+  if(!_cloudLoaded)return; /* never overwrite cloud with stale local state */
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
     var body=JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings});
@@ -486,6 +487,7 @@ async function cloudLoadConfig(){
   try{
     syncStat('reading map\u2026');
     var j=await _withTimeout(_fsRead('config/adminState'),12000,'map read');
+    _cloudLoaded=true;
     if(!j){syncStat('no map saved in cloud yet \u2014 publish from the device that has it',true);return false;}
     var raw=(j.fields&&j.fields.state&&j.fields.state.stringValue)||'';
     var o=null;try{o=JSON.parse(raw||'{}');}catch(e){o=null;}
