@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EV Survey · Admin (Material 3)</title>
+<title>EV Survey · SUPER ADMIN (map authoring)</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
@@ -188,7 +188,7 @@
 <body>
   <header class="topbar">
     <span class="material-symbols-outlined" style="color:var(--primary);font-size:28px">ev_station</span>
-    <div class="logo">EV Survey Admin</div>
+    <div class="logo">EV Survey · Super Admin</div>
     <div class="spacer"></div>
     <button class="mini" id="exportBtn"><span class="material-symbols-outlined">download</span>Export</button>
     <button class="mini" id="importBtn"><span class="material-symbols-outlined">upload</span>Import</button>
@@ -295,7 +295,7 @@
         <button class="btn" id="fbConnect" style="margin-top:12px"><span class="material-symbols-outlined">cloud_sync</span>Save &amp; connect</button>
         <label class="lab" style="margin-top:14px">Sync</label>
         <button class="btn ghost sm" id="fbPublish"><span class="material-symbols-outlined">cloud_upload</span>Publish worklist to inspectors</button>
-        <button class="btn ghost sm" id="fbPublishJur" style="margin-top:8px"><span class="material-symbols-outlined">map</span>Publish jurisdiction map</button>
+        <button class="btn ghost sm" id="fbPublishJur" style="margin-top:8px"><span class="material-symbols-outlined">cloud_upload</span>PUBLISH MAP to all devices</button>
         <button class="btn ghost sm" id="fbPullJur" style="margin-top:8px"><span class="material-symbols-outlined">cloud_download</span>Reload map from cloud</button>
         <button class="btn ghost sm" id="fbPublishForms" style="margin-top:8px"><span class="material-symbols-outlined">dynamic_form</span>Publish survey forms</button>
         <button class="btn ghost sm" id="fbResync" style="margin-top:8px"><span class="material-symbols-outlined">sync_problem</span>Re-tag &amp; sync site RTOs</button>
@@ -468,16 +468,20 @@ function syncStat(text,err){
   }catch(_){}
 }
 function cloudSaveConfig(){
-  if(typeof db==='undefined'||!db||!_bootDone)return;
+  if(!_bootDone)return;
   clearTimeout(_cfgSaveT);
   _cfgSaveT=setTimeout(function(){
-    try{db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:Date.now()}).then(function(){try{if(typeof setStatus==='function')setStatus('Settings synced \u00b7 '+new Date().toLocaleTimeString(),true);}catch(e){}syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(err){syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true);});}catch(e){}
+    var body=JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings});
+    _fsWrite('config/adminState',{state:{stringValue:body},updatedAt:{integerValue:String(Date.now())}}).then(
+      function(){syncStat('settings SAVED '+new Date().toLocaleTimeString());},
+      function(err){ if(typeof db!=='undefined'&&db){ db.collection('config').doc('adminState').set({state:body,updatedAt:Date.now()}).then(function(){syncStat('settings SAVED '+new Date().toLocaleTimeString());},function(e2){syncStat('SAVE FAILED \u2014 '+((e2&&e2.message)||e2),true);}); } else { syncStat('SAVE FAILED \u2014 '+((err&&err.message)||err),true); } });
   },1500);
 }
 function _withTimeout(pr,ms,label){return Promise.race([pr,new Promise(function(_,rej){setTimeout(function(){rej(new Error((label||'request')+' timed out (network blocking Firestore)'));},ms);})]);}
 var FS_PROJ='ev-survey-mh';
 function _fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+FS_PROJ+'/databases/(default)/documents/';}
 function _fsRead(docPath){return fetch(_fsBase()+docPath,{method:'GET'}).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});}
+function _fsWrite(docPath,fields){return fetch(_fsBase()+docPath,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:fields})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return true;});}
 async function cloudLoadConfig(){
   try{
     syncStat('reading map\u2026');
@@ -1106,7 +1110,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
 /* ---------- boot ---------- */
 function refreshAll(){renderRtos();document.getElementById('radius').value=state.settings.radius||200;if(state._talukas)applyDefaultAssign();renderTalukas();renderLegend();renderAssign();renderSites();renderForm();renderStats();}
 loadState();ensureForms();initMap();refreshAll();setTimeout(()=>{try{map.fitBounds(talukaLayer.getBounds().pad(.02));}catch(e){}},350);
-try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='build v12 \u00b7 cloud-sync';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
+try{var _bs=document.createElement('div');_bs.id='buildStamp';_bs.textContent='SUPER-ADMIN v1 \u00b7 map authoring';_bs.style.cssText='position:fixed;left:8px;bottom:6px;z-index:99999;font:600 11px/1 sans-serif;color:#0e5f54;background:rgba(255,255,255,.85);padding:3px 7px;border-radius:6px;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(_bs);}catch(e){}
 // ensure satellite tiles load once the Material layout has sized the map container
 function fixMap(){ if(map){ map.invalidateSize(); } }
 window.addEventListener('resize',fixMap);
@@ -1439,13 +1443,15 @@ window.addEventListener('load',()=>setTimeout(fixMap,200));
   $('rtRto').addEventListener('click',function(){showResp('rto');});
   $('rtMs').addEventListener('click',function(){showResp('msrtc');});
   $('fbPublishJur').addEventListener('click',async function(){
-    if(!db&&!connect(true)){flash('<span class="material-symbols-outlined">error</span> Connect to Firebase first.');return;}
+    if(!db)connect(true);
     toast('<span class="material-symbols-outlined">map</span> Publishing jurisdiction map\u2026',true);
     try{
       var _now=Date.now();
-      await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:_now});
-      await db.collection('config').doc('adminState').set({state:JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings}),updatedAt:_now});
-      flash('<span class="material-symbols-outlined">cloud_done</span> Map pushed to cloud \u2014 it will load on every other device on next open.');
+      var stBody=JSON.stringify({rtos:state.rtos,assign:state.assign,forms:state.forms,settings:state.settings});
+      try{ await _fsWrite('config/adminState',{state:{stringValue:stBody},updatedAt:{integerValue:String(_now)}}); }
+      catch(eRest){ if(typeof db!=='undefined'&&db){ await db.collection('config').doc('adminState').set({state:stBody,updatedAt:_now}); } else { throw eRest; } }
+      try{ if((typeof db!=='undefined'&&db)||connect(true)) await db.collection('config').doc('jurisdiction').set({assign:JSON.stringify(state.assign),rtos:state.rtos,updatedAt:_now}); }catch(eJ){}
+      flash('<span class="material-symbols-outlined">cloud_done</span> Map pushed to cloud \u2014 the Admin app will show it on next open / Reload.');
       syncStat('map PUBLISHED '+new Date().toLocaleTimeString());
     }catch(e){flash('<span class="material-symbols-outlined">error</span> Failed: '+(e.message||e),6000);syncStat('PUBLISH FAILED \u2014 '+(e.message||e),true);}
   });
